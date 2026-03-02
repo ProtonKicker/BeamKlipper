@@ -11,16 +11,18 @@ plugins {
     id 'com.chaquo.python'
 }
 
+def commit = getGitCommitHash(file('.'))
+
 android {
     namespace 'ru.ytkab0bp.beamklipper'
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId "ru.ytkab0bp.beamklipper"
         minSdk 21
-        targetSdk 34
-        versionCode 7
-        versionName "1.0.4_klipper-0.12.0"
+        targetSdk 35
+        versionCode 10
+        versionName "2.0.0_klipper-0.12.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -30,7 +32,7 @@ android {
                 options("--extra-index-url", "https://beam3d.ru/pypi")
 
                 install "cffi==1.15.1"
-                install "pyserial==3.4"
+                install "pyserial==3.5"
                 install "greenlet==3.0.1"
                 install "python-can==3.3.4"
                 install "markupsafe==2.1.5"
@@ -51,6 +53,7 @@ android {
                 install "python-periphery==2.4.1"
                 install "pynacl==1.5.0"
                 install "numpy==1.26.2"
+                install "click==8.1.8"
             }
             pyc {
                 src false
@@ -63,8 +66,19 @@ android {
 
     buildTypes {
         release {
+            buildConfigField "boolean", "IS_GOOGLE_PLAY", "false"
+            buildConfigField "String", "COMMIT", "\"" + commit + "\""
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            buildConfigField "boolean", "IS_GOOGLE_PLAY", "false"
+            buildConfigField "String", "COMMIT", "\"" + commit + "\""
+            ndk {
+                debugSymbolLevel 'NONE'
+                //noinspection ChromeOsAbiSupport
+                abiFilters "arm64-v8a"
+            }
         }
     }
     compileOptions {
@@ -86,26 +100,30 @@ android {
 
     applicationVariants.all { variant ->
         variant.outputs.all {
-            outputFileName = "BeamKlipper_" + getGitCommitHash(file('.')) + ".apk"
+            outputFileName = "BeamKlipper_" + commit + ".apk"
         }
     }
 }
 
 dependencies {
     implementation 'com.github.mik3y:usb-serial-for-android:3.7.2'
-    implementation 'androidx.annotation:annotation:1.8.2'
-    implementation 'androidx.core:core:1.13.1'
-    implementation 'androidx.activity:activity:1.9.2'
+    implementation 'androidx.annotation:annotation:1.9.1'
+    implementation 'androidx.core:core:1.16.0'
+    implementation 'androidx.activity:activity:1.10.1'
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'com.goterl:lazysodium-android:5.1.0@aar'
-    implementation 'org.java-websocket:Java-WebSocket:1.5.7'
+    implementation 'org.java-websocket:Java-WebSocket:1.6.0'
     implementation 'com.google.android.material:material:1.12.0'
     implementation 'org.tukaani:xz:1.9'
     implementation 'org.kamranzafar:jtar:2.3'
     //noinspection GradleDependency
     implementation 'com.squareup.okhttp3:okhttp:3.12.6'
-    implementation 'com.arthenica:ffmpeg-kit-video:6.0-2.LTS'
+    implementation 'com.google.code.gson:gson:2.13.1'
+    implementation 'com.loopj.android:android-async-http:1.4.11'
+    implementation 'com.github.androidmads:QRGenerator:1.0.5'
 
+    implementation project(":remotebeamlib")
+    implementation project(":sapil")
     implementation project(":eventbus")
     implementation project(":eventbus_api")
     annotationProcessor project(":eventbus_processor")

@@ -150,11 +150,11 @@ public class KlipperInstanceView extends LinearLayout {
         this.id = null;
         if (Prefs.isMainsailEnabled()) {
             icon.setImageResource(R.drawable.ic_sailing_24);
-            title.setText(R.string.mainsail);
+            title.setText(R.string.Mainsail);
             setColorIndex(6);
         } else {
             icon.setImageResource(R.drawable.ic_square_stack_up_outline_28);
-            title.setText(R.string.fluidd);
+            title.setText(R.string.Fluidd);
             setColorIndex(9);
         }
 
@@ -164,7 +164,12 @@ public class KlipperInstanceView extends LinearLayout {
         if (visible) {
             bindWebSubtitle();
         }
-        setOnClickListener(v -> v.getContext().startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("http://127.0.0.1:" + WebService.PORT + "/"))));
+        setOnClickListener(v -> {
+            WifiManager wm = (WifiManager) KlipperApp.INSTANCE.getSystemService(Context.WIFI_SERVICE);
+            int i = wm.getConnectionInfo().getIpAddress();
+            String ip = i == 0 || !KlipperInstance.isWebServerRunning() ? "127.0.0.1" : Formatter.formatIpAddress(i);
+            v.getContext().startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("http://" + ip + ":" + WebService.PORT + "/")));
+        });
         setClickable(visible);
 
         startStopButton.setVisibility(GONE);
@@ -172,7 +177,7 @@ public class KlipperInstanceView extends LinearLayout {
 
     private void bindWebSubtitle() {
         WifiManager wm = (WifiManager) KlipperApp.INSTANCE.getSystemService(Context.WIFI_SERVICE);
-        subtitle.setText(KlipperApp.INSTANCE.getString(R.string.ip_info, Formatter.formatIpAddress(wm.getConnectionInfo().getIpAddress()), WebService.PORT));
+        subtitle.setText(KlipperApp.INSTANCE.getString(R.string.IPInfo, Formatter.formatIpAddress(wm.getConnectionInfo().getIpAddress()), WebService.PORT));
     }
 
     public void bind(KlipperInstance instance) {
@@ -182,9 +187,9 @@ public class KlipperInstanceView extends LinearLayout {
         title.setText(instance.name);
 
         if (instance.getState() == KlipperInstance.State.STARTING) {
-            subtitle.setText(R.string.instance_starting);
+            subtitle.setText(R.string.InstanceStarting);
         } else if (instance.getState() == KlipperInstance.State.STOPPING) {
-            subtitle.setText(R.string.instance_stopping);
+            subtitle.setText(R.string.InstanceStopping);
         }
 
         boolean wasVisible = subtitle.getTag() != null;
@@ -206,8 +211,8 @@ public class KlipperInstanceView extends LinearLayout {
             if (inst.getState() == KlipperInstance.State.IDLE) {
                 if (!KlipperInstance.hasFreeSlots()) {
                     new MaterialAlertDialogBuilder(getContext())
-                            .setTitle(R.string.no_free_slots)
-                            .setMessage(getContext().getString(R.string.no_free_slots_description, KlipperInstance.SLOTS_COUNT))
+                            .setTitle(R.string.NoFreeSlots)
+                            .setMessage(getContext().getString(R.string.NoFreeSlotsDescription, KlipperInstance.SLOTS_COUNT))
                             .setPositiveButton(android.R.string.ok, null)
                             .show();
                     return;
@@ -286,9 +291,9 @@ public class KlipperInstanceView extends LinearLayout {
     public void onStateChanged(InstanceStateChangedEvent e) {
         if (Objects.equals(id, e.id)) {
             if (e.state == KlipperInstance.State.STARTING) {
-                subtitle.setText(R.string.instance_starting);
+                subtitle.setText(R.string.InstanceStarting);
             } else if (e.state == KlipperInstance.State.STOPPING) {
-                subtitle.setText(R.string.instance_stopping);
+                subtitle.setText(R.string.InstanceStopping);
             }
 
             boolean wasVisible = subtitle.getTag() != null;
