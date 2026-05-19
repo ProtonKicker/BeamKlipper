@@ -1,0 +1,182 @@
+name: BUILD
+
+on:
+  push:
+    branches:
+      - develop
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - develop
+      - master
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+
+      - name: Run lint
+        run: |
+          npm run lint -- --no-fix
+
+      - name: Run type check
+        run: |
+          npm run type-check
+
+      - name: Run tests
+        run: |
+          npm run test:unit
+
+      - name: Run circular references check
+        run: |
+          npm run circular-check
+
+      - name: Build
+        run: |
+          npm run build
+
+      - name: Upload fluidd.zip
+        uses: actions/upload-artifact@v7
+        with:
+          name: fluidd-${{ github.sha }}.zip
+          path: ./dist
+
+  publish-docker:
+    name: Publish ${{ matrix.type }} Image
+    needs: build
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - type: Docker
+            image-name: ${{ github.repository }}
+            base-image: nginx:alpine
+            port: 80
+          - type: Docker Unprivileged
+            image-name: ${{ github.repository }}-unprivileged
+            base-image: nginxinc/nginx-unprivileged:alpine
+            port: 8080
+    permissions:
+      id-token: write
+      contents: read
+      attestations: write
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download fluidd.zip
+        uses: actions/download-artifact@v8
+        with:
+          name: fluidd-${{ github.sha }}.zip
+          path: ./dist
+
+      - name: Update nginx configuration
+        run: |
+          sed -i "s/\${PORT} default_server;/${{ matrix.port }} default_server;/g" ./server/nginx/default.conf.template
+
+      - name: Prepare Docker image metadata
+        id: docker_meta
+        uses: docker/metadata-action@v6
+        with:
+          images: |
+            ghcr.io/${{ matrix.image-name }}
+          tags: |
+            type=semver,pattern={{raw}}
+            type=ref,event=pr
+            type=sha,format=long
+            type=raw,value=latest-develop,enable=${{ github.ref == 'refs/heads/develop' }}
+            type=raw,value=latest-master,enable=${{ github.ref == 'refs/heads/master' }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        id: docker_push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8,linux/ppc64le,linux/s390x
+          build-args: |
+            BASE_IMAGE=${{ matrix.base-image }}
+          push: true
+          sbom: true
+          provenance: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: ${{ steps.docker_meta.outputs.tags }}
+          labels: ${{ steps.docker_meta.outputs.labels }}
+          annotations: ${{ steps.docker_meta.outputs.annotations }}
+
+      - name: Attest Docker image
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-name: ghcr.io/${{ matrix.image-name }}
+          subject-digest: ${{ steps.docker_push.outputs.digest }}
+          push-to-registry: true
+
+  publish-web:
+    name: Deploy to Host
+    needs: build
+    if: ${{ github.repository == 'fluidd-core/fluidd' && github.ref == 'refs/heads/develop' }}
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download fluidd.zip
+        uses: actions/download-artifact@v8
+        with:
+          name: fluidd-${{ github.sha }}.zip
+          path: ./dist
+
+      - name: Prepare Deploy
+        run: |
+          cp ./server/config.json ./dist/config.json
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: us-east-1
+          role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE }}
+
+      - name: Deploy to Host
+        uses: reggionick/s3-deploy@v4
+        with:
+          folder: dist
+          bucket: ${{ secrets.DEV_S3_BUCKET_NAME }}
+          bucket-region: us-east-1
+          dist-id: ${{ secrets.DEV_CF_DISTRIBUTION_ID }}
+          delete-removed: true
+          no-cache: true
+          private: true
