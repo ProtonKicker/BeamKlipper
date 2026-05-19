@@ -59,7 +59,7 @@ pyinstaller ^
     --noconfirm ^
     src\main.py
 
-if %errorlevel% equ 0 (
+if exist "dist\WinKlipper\WinKlipper.exe" (
     echo.
     echo ============================================
     echo SUCCESS: WinKlipper built in dist\WinKlipper\
@@ -73,7 +73,7 @@ if %errorlevel% equ 0 (
 ) else (
     echo.
     echo ============================================
-    echo FAILED: Build error
+    echo FAILED: Build error - exe not found
     echo ============================================
 )
 
