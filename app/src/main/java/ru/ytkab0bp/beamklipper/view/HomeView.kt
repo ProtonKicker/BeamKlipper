@@ -26,7 +26,7 @@ class HomeView(context: Context) : FrameLayout(context) {
     private var isTouchDisabled = false
     private var processingSwipe = false
     private var animation: SpringAnimation? = null
-    private var progress = 0f
+    internal var progress = 0f
     private var scrollView: View? = null
 
     init {

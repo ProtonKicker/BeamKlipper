@@ -40,7 +40,7 @@ object BeamServerData {
 
     @JvmStatic
     fun isBoostyAvailable(): Boolean {
-        return !BuildConfig.IS_GOOGLE_PLAY || Prefs.isRussianIP()
+        return !BuildConfig.IS_GOOGLE_PLAY || Prefs.isRussianIP
     }
 
     @JvmStatic
@@ -53,7 +53,7 @@ object BeamServerData {
         client.get(DATA_URL, object : AsyncHttpResponseHandler() {
             override fun onSuccess(statusCode: Int, headers: Array<out cz.msebera.android.httpclient.Header>?, responseBody: ByteArray?) {
                 val str = String(responseBody!!, Charsets.UTF_8)
-                Prefs.setBeamServerData(str)
+                Prefs.beamServerData = str
                 Prefs.setLastCheckedInfo()
 
                 SERVER_DATA = ServerData(JSONObject(str))
@@ -69,7 +69,7 @@ object BeamServerData {
                         }
 
                         private fun setIsRussia(v: Boolean) {
-                            Prefs.setRussianIP(v)
+                            Prefs.isRussianIP = v
                             KlipperApp.EVENT_BUS.fireEvent(BeamServerDataUpdatedEvent())
                         }
                     })

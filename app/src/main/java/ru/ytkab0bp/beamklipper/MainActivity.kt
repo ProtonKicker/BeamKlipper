@@ -33,6 +33,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.EdgeToEdge
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.dynamicanimation.animation.FloatValueHolder
 import androidx.dynamicanimation.animation.SpringAnimation
@@ -459,7 +460,7 @@ class MainActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(52))
             setOnClickListener {
                 if (isRequestingRemoteToken) return@setOnClickListener
-                if (Prefs.getCloudAPIToken() == null ||
+                if (Prefs.cloudApiToken == null ||
                     CloudController.getUserFeatures() != null &&
                     CloudController.getUserFeatures()!!.remoteAccessLevel != -1 &&
                     CloudController.getUserInfo() != null &&
@@ -585,7 +586,7 @@ class MainActivity : AppCompatActivity() {
 
                 if (editInstance != null) {
                     editInstance!!.name = nameRow.text.toString().trim()
-                    editInstance!!.autostart = autostartRow.isChecked()
+                    editInstance!!.autostart = autostartRow.isChecked
                     KlipperApp.DATABASE.update(editInstance!!)
                     editInstance = null
                     pendingRemotePrinter = null
@@ -605,7 +606,7 @@ class MainActivity : AppCompatActivity() {
                 val inst = KlipperInstance().apply {
                     id = UUID.randomUUID().toString()
                     name = nameRow.text.toString().trim()
-                    autostart = autostartRow.isChecked()
+                    autostart = autostartRow.isChecked
                 }
                 val cfg = File(inst.publicDirectory, "config/printer.cfg")
                 cfg.parentFile!!.mkdirs()
@@ -750,23 +751,26 @@ class MainActivity : AppCompatActivity() {
             BeamServerData.load()
             ChangeLogBottomSheet(this@MainActivity).show()
         }
+
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (newOrEditLayout.visibility != View.GONE) {
+                    animateNewOrEditLayout(false)
+                    return
+                }
+                if (homeView.progress != 0f) {
+                    homeView.animateTo(0f)
+                    return
+                }
+                isEnabled = false
+                onBackPressedDispatcher.onBackPressed()
+            }
+        })
     }
 
     override fun onDestroy() {
         super.onDestroy()
         KlipperApp.EVENT_BUS.unregisterListener(this)
-    }
-
-    override fun onBackPressed() {
-        if (newOrEditLayout.visibility != View.GONE) {
-            animateNewOrEditLayout(false)
-            return
-        }
-        if (homeView.progress != 0f) {
-            homeView.animateTo(0f)
-            return
-        }
-        super.onBackPressed()
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {

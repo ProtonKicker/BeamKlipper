@@ -51,11 +51,9 @@ class PreferenceSwitchView(context: Context) : LinearLayout(context) {
         addView(mSwitch, LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
     }
 
-    fun setChecked(checked: Boolean) {
-        mSwitch.isChecked = checked
-    }
-
-    fun isChecked(): Boolean = mSwitch.isChecked
+    var isChecked: Boolean
+        get() = mSwitch.isChecked
+        set(value) { mSwitch.isChecked = value }
 
     fun bind(title: String, subtitle: String?, checked: Boolean) {
         this.title.text = title

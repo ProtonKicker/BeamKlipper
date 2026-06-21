@@ -53,6 +53,9 @@ object ViewUtils {
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, KlipperApp.INSTANCE.resources.displayMetrics).toInt()
 
     @JvmStatic
+    fun dp(dp: Int): Int = dp(dp.toFloat())
+
+    @JvmStatic
     fun resolveDrawable(ctx: Context, attr: Int): Drawable {
         val arr = ctx.obtainStyledAttributes(intArrayOf(attr))
         val d = arr.getDrawable(0)!!

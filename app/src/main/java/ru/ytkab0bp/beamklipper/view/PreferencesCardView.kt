@@ -51,7 +51,7 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
     private val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val dimmPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val header: LinearLayout
+    internal val header: LinearLayout
     private val title: TextView
     private var progress = 0f
     private val listView: RecyclerView
@@ -148,7 +148,7 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
                     VIEW_TYPE_SWITCH -> {
                         val sw = holder.itemView as PreferenceSwitchView
                         if (position == cameraEnabledRow) {
-                            sw.bind(context.getString(R.string.EnableCamera), null, Prefs.isCameraEnabled())
+                            sw.bind(context.getString(R.string.EnableCamera), null, Prefs.isCameraEnabled)
                             sw.setOnClickListener { v ->
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
                                     ContextCompat.checkSelfPermission(v.context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
@@ -156,9 +156,9 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
                                     ActivityCompat.requestPermissions(v.context as Activity, arrayOf(Manifest.permission.CAMERA), 0)
                                     return@setOnClickListener
                                 }
-                                sw.setChecked(!sw.isChecked())
-                                Prefs.setCameraEnabled(sw.isChecked())
-                                KlipperInstance.onCameraConfigChanged(sw.isChecked())
+                                sw.isChecked = !sw.isChecked
+                                Prefs.isCameraEnabled = sw.isChecked
+                                KlipperInstance.onCameraConfigChanged(sw.isChecked)
                             }
                         }
                     }
@@ -189,7 +189,7 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
                                 }
                             }
                             accountStatusRow -> {
-                                if (Prefs.getCloudAPIToken() == null) {
+                                if (Prefs.cloudApiToken == null) {
                                     pref.bind(context.getString(R.string.SettingsCloudNotLoggedIn), context.getString(R.string.SettingsCloudTapToShowMore))
                                 } else {
                                     if (CloudController.getUserInfo() == null) {
@@ -223,7 +223,7 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
                                 v.bind(
                                     KlipperApp.INSTANCE.getString(R.string.USBDeviceNaming),
                                     KlipperApp.INSTANCE.getString(
-                                        if (Prefs.getUsbDeviceNaming() == Prefs.USB_DEVICE_NAMING_BY_PATH) R.string.USBDeviceNamingByPath
+                                        if (Prefs.usbDeviceNaming == Prefs.USB_DEVICE_NAMING_BY_PATH) R.string.USBDeviceNamingByPath
                                         else R.string.USBDeviceNamingByVidPid
                                     )
                                 )
@@ -234,7 +234,7 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
                                             KlipperApp.INSTANCE.getString(R.string.USBDeviceNamingByPath),
                                             KlipperApp.INSTANCE.getString(R.string.USBDeviceNamingByVidPid)
                                         ) { dialog, which ->
-                                            Prefs.setUsbDeviceNaming(which)
+                                            Prefs.usbDeviceNaming = which
                                             adapter.notifyItemChanged(holder.adapterPosition)
                                         })
                                         .show()
@@ -244,7 +244,7 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
                                 v.bind(
                                     KlipperApp.INSTANCE.getString(R.string.WebFrontend),
                                     KlipperApp.INSTANCE.getString(
-                                        if (Prefs.isMainsailEnabled()) R.string.Mainsail else R.string.Fluidd
+                                        if (Prefs.isMainsailEnabled) R.string.Mainsail else R.string.Fluidd
                                     )
                                 )
                                 v.setOnClickListener {
@@ -254,7 +254,7 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
                                             KlipperApp.INSTANCE.getString(R.string.Fluidd),
                                             KlipperApp.INSTANCE.getString(R.string.Mainsail)
                                         ) { dialog, which ->
-                                            Prefs.setMainsailEnabled(which == 1)
+                                            Prefs.isMainsailEnabled = which == 1
                                             adapter.notifyItemChanged(holder.adapterPosition)
                                         })
                                         .show()

@@ -174,7 +174,7 @@ class CloudActivity : AppCompatActivity() {
     }
 
     private fun bindLoginButton(animate: Boolean) {
-        val loggedIn = Prefs.getCloudAPIToken() != null
+        val loggedIn = Prefs.cloudApiToken != null
         val loading = !loggedIn && CloudController.isLoggingIn()
         val wasLoading = buttonProgress.tag != null
 
@@ -245,7 +245,7 @@ class CloudActivity : AppCompatActivity() {
                     .setNegativeButton(R.string.No, null)
                     .setPositiveButton(R.string.Yes) { _, _ -> CloudController.cancelLogin() }
                     .show()
-            } else if (Prefs.getCloudAPIToken() != null) {
+            } else if (Prefs.cloudApiToken != null) {
                 CloudController.logout()
             } else {
                 CloudController.beginLogin()

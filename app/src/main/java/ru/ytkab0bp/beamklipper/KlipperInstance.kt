@@ -218,7 +218,7 @@ class KlipperInstance {
                 }.also { webServerConnection = it }, Context.BIND_AUTO_CREATE)
             }
 
-            if (Prefs.isCameraEnabled()) {
+            if (Prefs.isCameraEnabled) {
                 if (cameraServerConnection == null) {
                     KlipperApp.INSTANCE.bindService(Intent(KlipperApp.INSTANCE, CameraService::class.java), object : ServiceConnection {
                         override fun onServiceConnected(name: ComponentName, service: IBinder) {}

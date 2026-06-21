@@ -125,7 +125,7 @@ class KlipperInstanceView(context: Context) : LinearLayout(context) {
 
     fun bindWeb() {
         id = null
-        if (Prefs.isMainsailEnabled()) {
+        if (Prefs.isMainsailEnabled) {
             icon.setImageResource(R.drawable.ic_sailing_24)
             title.setText(R.string.Mainsail)
             setColorIndex(6)

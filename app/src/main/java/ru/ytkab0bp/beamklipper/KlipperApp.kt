@@ -36,7 +36,7 @@ class KlipperApp : Application() {
             false
         }
         try {
-            BeamServerData.SERVER_DATA = BeamServerData.ServerData(JSONObject(Prefs.getBeamServerData()))
+            BeamServerData.SERVER_DATA = BeamServerData.ServerData(JSONObject(Prefs.beamServerData))
         } catch (e: org.json.JSONException) {
             throw RuntimeException(e)
         }
