@@ -23,6 +23,7 @@ import android.os.Binder
 import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
+import android.content.pm.ServiceInfo
 import android.os.IBinder
 import android.os.PowerManager
 import android.os.Process
@@ -113,7 +114,11 @@ class CameraService : Service() {
             .setSmallIcon(R.drawable.icon_adaptive_foreground)
             .setOngoing(true)
         notificationManager.notify(ID, not.build())
-        startForeground(ID, not.build())
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(ID, not.build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA)
+        } else {
+            startForeground(ID, not.build())
+        }
         return Binder()
     }
 

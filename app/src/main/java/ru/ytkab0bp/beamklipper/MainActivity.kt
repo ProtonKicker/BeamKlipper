@@ -32,7 +32,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.EdgeToEdge
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.dynamicanimation.animation.FloatValueHolder
@@ -111,7 +111,7 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("BatteryLife", "InlinedApi")
     override fun onCreate(savedInstanceState: Bundle?) {
-        EdgeToEdge.enable(this)
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
         val uiModeManager = getSystemService(UI_MODE_SERVICE) as UiModeManager
@@ -186,7 +186,7 @@ class MainActivity : AppCompatActivity() {
         listCardView = MaterialCardView(this).apply {
             setStrokeColor(0)
             setCardBackgroundColor(ViewUtils.resolveColor(this@MainActivity, R.attr.cardOutlineColor))
-            radius = ViewUtils.dp(32)
+            radius = ViewUtils.dp(32).toFloat()
         }
 
         preferencesView = PreferencesCardView(this).apply {
@@ -791,9 +791,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (event.action == KeyEvent.ACTION_DOWN) {
-            val focusInBadges = homeView.targetProgress == 1f
-            val focusInList = homeView.targetProgress == 0f
-            val focusInSettings = homeView.targetProgress == -1f
+            val focusInBadges = homeView.getTargetProgress() == 1f
+            val focusInList = homeView.getTargetProgress() == 0f
+            val focusInSettings = homeView.getTargetProgress() == -1f
 
             if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
                 if (focusInSettings) return super.onKeyDown(keyCode, event)
@@ -895,7 +895,7 @@ class MainActivity : AppCompatActivity() {
 
     @EventHandler(runOnMainThread = true)
     fun onInstanceCreated(e: InstanceCreatedEvent) {
-        instances.add(KlipperInstance.getInstance(e.id))
+        instances.add(KlipperInstance.getInstance(e.id) ?: return)
         listView.adapter!!.notifyItemInserted(listView.adapter!!.itemCount - 2)
     }
 

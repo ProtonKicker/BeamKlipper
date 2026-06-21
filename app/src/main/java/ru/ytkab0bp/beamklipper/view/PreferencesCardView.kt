@@ -54,7 +54,7 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
     internal val header: LinearLayout
     private val title: TextView
     private var progress = 0f
-    private val listView: RecyclerView
+    val listView: RecyclerView
     private val path = Path()
     private val adapter: RecyclerView.Adapter<RecyclerView.ViewHolder>
 

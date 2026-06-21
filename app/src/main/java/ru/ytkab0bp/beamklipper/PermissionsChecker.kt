@@ -21,7 +21,7 @@ object PermissionsChecker {
 
     @JvmStatic
     fun hasNotificationPerm(): Boolean {
-        return Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
                 ContextCompat.checkSelfPermission(KlipperApp.INSTANCE, "android.permission.POST_NOTIFICATIONS") == android.content.pm.PackageManager.PERMISSION_GRANTED
     }
 

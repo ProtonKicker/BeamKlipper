@@ -3,6 +3,7 @@ package ru.ytkab0bp.beamklipper.service
 import android.app.Notification
 import android.content.Intent
 import android.os.Build
+import android.content.pm.ServiceInfo
 import android.os.IBinder
 import android.system.Os
 import android.util.Log
@@ -36,7 +37,11 @@ open class BaseMoonrakerService(private val num: Int) : BasePythonService() {
             .setSmallIcon(R.drawable.icon_adaptive_foreground)
             .setOngoing(true)
         notificationManager.notify(BASE_ID + num, not.build())
-        startForeground(BASE_ID + num, not.build())
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(BASE_ID + num, not.build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+        } else {
+            startForeground(BASE_ID + num, not.build())
+        }
         return b
     }
 

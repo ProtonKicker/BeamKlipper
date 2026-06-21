@@ -21,7 +21,7 @@ import ru.ytkab0bp.beamklipper.R
 import ru.ytkab0bp.beamklipper.utils.ViewUtils
 
 class RefBadgeView(context: Context) : LinearLayout(context) {
-    private val icon: ImageView
+    val icon: ImageView
     private val title: TextView
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private var outlinePaint: Paint? = null
