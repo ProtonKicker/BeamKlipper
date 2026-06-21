@@ -46,8 +46,8 @@ class CloudActivity : AppCompatActivity() {
     private lateinit var adapter: SimpleRecyclerAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
         EdgeToEdge.enable(this)
+        super.onCreate(savedInstanceState)
 
         val ll = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL

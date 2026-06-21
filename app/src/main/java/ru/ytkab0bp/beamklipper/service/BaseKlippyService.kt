@@ -21,12 +21,13 @@ open class BaseKlippyService(private val num: Int) : BasePythonService() {
     }
 
     override fun onBind(intent: Intent?): IBinder? {
-        val b = super.onBind(intent)
+        val b = super.onBind(intent) ?: return null
+        val inst = instance ?: return null
         val not = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
             Notification.Builder(this, KlipperApp.SERVICES_CHANNEL)
         else
             Notification.Builder(this)
-        not.setContentTitle(getString(R.string.KlippyTitle, instance!!.name))
+        not.setContentTitle(getString(R.string.KlippyTitle, inst.name))
             .setContentText(getString(R.string.KlippyDescription))
             .setSmallIcon(R.drawable.icon_adaptive_foreground)
             .setOngoing(true)

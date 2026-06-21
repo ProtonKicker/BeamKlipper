@@ -28,7 +28,8 @@ open class BasePythonService : Service() {
     protected lateinit var notificationManager: NotificationManager
 
     override fun onBind(intent: Intent?): IBinder? {
-        instance = KlipperInstance.getInstance(intent!!.getStringExtra(KEY_INSTANCE)!!)
+        val id = intent?.getStringExtra(KEY_INSTANCE) ?: return null
+        instance = KlipperInstance.getInstance(id)
         pythonHandler?.post { onStartPython() }
         return Binder()
     }

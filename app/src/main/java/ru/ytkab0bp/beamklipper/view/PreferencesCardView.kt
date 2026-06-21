@@ -153,7 +153,7 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
                                     ContextCompat.checkSelfPermission(v.context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
                                 ) {
-                                    ActivityCompat.requestPermissions(v.context as Activity, arrayOf(Manifest.permission.CAMERA), 0)
+                                    ActivityCompat.requestPermissions(context as Activity, arrayOf(Manifest.permission.CAMERA), 0)
                                     return@setOnClickListener
                                 }
                                 sw.isChecked = !sw.isChecked
@@ -301,10 +301,6 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
             adapter.notifyItemChanged(accountStatusRow)
         }
     }
-
-    fun getHeader(): LinearLayout = header
-
-    fun getListView(): RecyclerView = listView
 
     private fun updateRows() {
         itemsCount = 0

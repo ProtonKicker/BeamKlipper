@@ -169,7 +169,8 @@ class WebService : Service() {
             when (session.uri) {
                 "/beam/arduino_reset" -> {
                     if (checkRemote(session)) return Response.newFixedLengthResponse("")
-                    val uid = session.parameters["serial"]!![0].substring(
+                    val serial = session.parameters["serial"]?.get(0) ?: return Response.newFixedLengthResponse("")
+                    val uid = serial.substring(
                         File(KlipperApp.INSTANCE.filesDir, "serial").absolutePath.length + 1)
                     val device = UsbSerialManager.getDevice(uid)
                     if (device != null) {
@@ -186,19 +187,18 @@ class WebService : Service() {
                 }
                 "/beam/ffmpeg" -> {
                     if (checkRemote(session)) return Response.newFixedLengthResponse("")
-                    val s = FFmpegKit.execute(session.parameters["cmd"]!![0])
+                    val cmd = session.parameters["cmd"]?.get(0) ?: return Response.newFixedLengthResponse("")
+                    val s = FFmpegKit.execute(cmd)
                     return Response.newFixedLengthResponse(s.output)
                 }
                 "/beam/play_tone" -> {
                     if (checkRemote(session)) return Response.newFixedLengthResponse("{\"ok\": false}")
-                    try {
-                        val duration = session.parameters["duration"]!![0].toInt()
-                        val frequency = session.parameters["frequency"]!![0].toInt()
-                        playTone(duration, frequency)
-                        return Response.newFixedLengthResponse("{\"ok\": true}")
-                    } catch (_: NumberFormatException) {
-                        return Response.newFixedLengthResponse("{\"ok\": false}")
-                    }
+                    val duration = session.parameters["duration"]?.get(0)?.toIntOrNull()
+                        ?: return Response.newFixedLengthResponse("{\"ok\": false}")
+                    val frequency = session.parameters["frequency"]?.get(0)?.toIntOrNull()
+                        ?: return Response.newFixedLengthResponse("{\"ok\": false}")
+                    playTone(duration, frequency)
+                    return Response.newFixedLengthResponse("{\"ok\": true}")
                 }
                 "/beam/set_camera_flashlight" -> {
                     if (checkRemote(session)) return Response.newFixedLengthResponse("{\"ok\": false}")
