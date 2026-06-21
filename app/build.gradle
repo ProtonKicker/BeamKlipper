@@ -105,6 +105,10 @@ android {
         correctErrorTypes true
     }
 
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+
     applicationVariants.all { variant ->
         variant.outputs.all {
             outputFileName = "BeamKlipper_" + commit + ".apk"
