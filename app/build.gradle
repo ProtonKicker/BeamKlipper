@@ -9,7 +9,10 @@ import java.util.zip.ZipInputStream
 plugins {
     id 'com.android.application'
     id 'com.chaquo.python'
+    id 'org.jetbrains.kotlin.android'
 }
+
+apply plugin: 'kotlin-kapt'
 
 def commit = getGitCommitHash(file('.'))
 
@@ -98,6 +101,10 @@ android {
         buildConfig true
     }
 
+    kapt {
+        correctErrorTypes true
+    }
+
     applicationVariants.all { variant ->
         variant.outputs.all {
             outputFileName = "BeamKlipper_" + commit + ".apk"
@@ -126,7 +133,9 @@ dependencies {
     implementation project(":sapil")
     implementation project(":eventbus")
     implementation project(":eventbus_api")
-    annotationProcessor project(":eventbus_processor")
+    kapt project(":eventbus_processor")
+
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.8.0'
 
     constraints {
         implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.0") {
