@@ -61,7 +61,7 @@ class CameraService : Service() {
         private val handlerThreads = CopyOnWriteArrayList<CameraHandlerThread>()
     }
 
-    private lateinit var notificationManager: NotificationManager
+    private var notificationManager: NotificationManager? = null
     private var serverThread: ServerThread? = null
     private lateinit var cameraManager: CameraManager
     private var cameraThread: HandlerThread? = null
@@ -276,7 +276,7 @@ class CameraService : Service() {
         cameraThread?.quit()
         cameraHandler = null
         stopForeground(true)
-        notificationManager.cancel(ID)
+        notificationManager?.cancel(ID)
         unregisterReceiver(receiver)
         wakeLock?.release()
         android.os.Process.killProcess(android.os.Process.myPid())

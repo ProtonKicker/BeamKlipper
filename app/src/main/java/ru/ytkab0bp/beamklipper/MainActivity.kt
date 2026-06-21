@@ -507,10 +507,14 @@ class MainActivity : AppCompatActivity() {
                                         .show()
                                 }
                             } else {
-                                CloudAPI.INSTANCE.remoteCreatePrinter(editInstance!!.name, object : APICallback<CloudAPI.RemotePrinter> {
+                                val curInstance = editInstance ?: run {
+                                    isRequestingRemoteToken = false
+                                    return@setOnClickListener
+                                }
+                                CloudAPI.INSTANCE.remoteCreatePrinter(curInstance.name, object : APICallback<CloudAPI.RemotePrinter> {
                                     override fun onResponse(response: CloudAPI.RemotePrinter) {
-                                        editInstance!!.remoteId = response.id
-                                        editInstance!!.remoteToken = response.token
+                                        curInstance.remoteId = response.id
+                                        curInstance.remoteToken = response.token
                                         pendingRemotePrinter = response
                                         ViewUtils.postOnMainThread {
                                             isChecked = true
@@ -548,8 +552,9 @@ class MainActivity : AppCompatActivity() {
                 CloudAPI.INSTANCE.remoteGetPrinters(object : APICallback<List<CloudAPI.RemotePrinter>> {
                     override fun onResponse(response: List<CloudAPI.RemotePrinter>) {
                         isRequestingRemoteToken = false
+                        val instance = editInstance ?: return@setOnClickListener
                         for (printer in response) {
-                            if (printer.id == editInstance!!.remoteId) {
+                            if (printer.id == instance.remoteId) {
                                 ViewUtils.postOnMainThread { QRCodeAlertDialog(this@MainActivity, printer.publicUrl).show() }
                                 break
                             }
@@ -900,7 +905,7 @@ class MainActivity : AppCompatActivity() {
         for (j in instances.indices) {
             if (instances[j].id == e.id) {
                 idx = j
-                instances[idx] = KlipperInstance.getInstance(instances[idx].id)!!
+                instances[idx] = KlipperInstance.getInstance(instances[idx].id) ?: continue
                 break
             }
         }

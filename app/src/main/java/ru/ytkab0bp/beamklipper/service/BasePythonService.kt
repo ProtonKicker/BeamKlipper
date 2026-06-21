@@ -65,7 +65,8 @@ open class BasePythonService : Service() {
     protected open fun onStartPython() {}
 
     protected fun runPython(dir: File, module: String, vararg args: String) {
-        py!!.getModule("sys")["path"].callAttr("append", dir.absolutePath)
+        val p = py ?: return
+        p.getModule("sys")["path"].callAttr("append", dir.absolutePath)
         val pyModule = Python.getInstance().getModule(module)
         val argv = pyModule["sys"]["argv"].asList<PyObject>()
         argv.clear()

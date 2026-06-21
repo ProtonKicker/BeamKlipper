@@ -17,7 +17,10 @@ import java.io.FileNotFoundException
 import java.io.IOException
 
 class InstanceFilesProvider : DocumentsProvider() {
-    override fun onCreate(): Boolean = true
+    override fun onCreate(): Boolean {
+        super.onCreate()
+        return true
+    }
 
     override fun queryRoots(projection: Array<String>?): android.database.Cursor {
         val result = MatrixCursor(resolveRootProjection(projection))

@@ -333,12 +333,12 @@ class CloudActivity : AppCompatActivity() {
                     icon.setImageResource(R.drawable.ic_cloud_plus_outline_28)
                 }
 
-                val features = CloudController.getUserFeatures()
+                val features = CloudController.getUserFeatures() ?: return
                 val info = CloudController.getUserInfo()
                 val ctx = context
                 val items = mutableListOf<SimpleRecyclerItem<*>>()
 
-                if (!BuildConfig.IS_GOOGLE_PLAY && features!!.earlyAccessLevel != -1 && lvl.level >= features.earlyAccessLevel) {
+                if (!BuildConfig.IS_GOOGLE_PLAY && features.earlyAccessLevel != -1 && lvl.level >= features.earlyAccessLevel) {
                     items.add(CloudPreferenceItem()
                         .setForceDark(true)
                         .setPaddings(ViewUtils.dp(8))
@@ -346,7 +346,7 @@ class CloudActivity : AppCompatActivity() {
                         .setTitle(ctx.getString(R.string.SettingsCloudManageFeatureEarlyAccess))
                         .setSubtitle(ctx.getString(R.string.SettingsCloudManageFeatureEarlyAccessDescription)))
                 }
-                if (features!!.remoteAccessLevel != -1 && lvl.level >= features.remoteAccessLevel) {
+                if (features.remoteAccessLevel != -1 && lvl.level >= features.remoteAccessLevel) {
                     items.add(CloudPreferenceItem()
                         .setForceDark(true)
                         .setPaddings(ViewUtils.dp(8))
@@ -401,7 +401,7 @@ class CloudActivity : AppCompatActivity() {
                                 it.context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(lvl.subscribeOrUpgradeUrl)))
                             }
                             .setNegativeButton(R.string.SettingsCloudManageLevelRedirectAlreadySubscribed) { _, _ ->
-                                it.context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(features!!.alreadySubscribedInfoUrl)))
+                                it.context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(features.alreadySubscribedInfoUrl)))
                             }
                             .show()
                     }

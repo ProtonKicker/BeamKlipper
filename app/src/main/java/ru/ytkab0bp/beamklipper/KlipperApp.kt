@@ -25,7 +25,7 @@ class KlipperApp : Application() {
         KlipperInstance.onInstancesLoadedFromDB(DATABASE.getInstances())
         EventBus.registerImpl(this)
         BundleInstaller.init(this)
-        RemoteBeam.init(AndroidPlatform())
+        RemoteBeam.init(AndroidPlatform)
         CloudController.initCached()
         CloudController.init()
 

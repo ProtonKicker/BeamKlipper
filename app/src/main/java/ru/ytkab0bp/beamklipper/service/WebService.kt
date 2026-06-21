@@ -64,7 +64,7 @@ class WebService : Service() {
     }
 
     private val httpServer = HttpServer()
-    private lateinit var notificationManager: NotificationManager
+    private var notificationManager: NotificationManager? = null
     private var beeperThread: HandlerThread? = null
     private var beeperHandler: Handler? = null
 
@@ -102,7 +102,7 @@ class WebService : Service() {
         beeperThread = null
         beeperHandler = null
         stopForeground(true)
-        notificationManager.cancel(ID)
+        notificationManager?.cancel(ID)
     }
 
     private external fun generateTone(numSamples: Int, freq: Float): FloatArray
@@ -232,7 +232,7 @@ class WebService : Service() {
                         for ((key, value) in session.headers) {
                             con.addRequestProperty(key, value)
                         }
-                        val len = session.headers["content-length"]!!.toLong()
+                        val len = session.headers["content-length"]?.toLongOrNull() ?: 0L
                         val input = session.inputStream
                         val output = con.outputStream
                         val buffer = ByteArray(10240)
