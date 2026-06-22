@@ -47,9 +47,9 @@ class InstanceFilesProvider : DocumentsProvider() {
 
     override fun queryChildDocuments(parentDocumentId: String, projection: Array<String>?, sortOrder: String?): android.database.Cursor {
         val result = MatrixCursor(resolveDocumentProjection(projection))
-        val parent = getFileForDocId(parentDocumentId)
+        val parent = getFileForDocId(parentDocumentId) ?: return result
         val instance = getInstanceForDocId(parentDocumentId)
-        for (file in parent!!.listFiles()!!) {
+        for (file in parent.listFiles() ?: return result) {
             includeFile(result, null, instance, file)
         }
         return result
@@ -61,7 +61,8 @@ class InstanceFilesProvider : DocumentsProvider() {
         val isWrite = mode.indexOf('w') != -1
         return if (isWrite) {
             try {
-                val handler = Handler(context!!.mainLooper)
+                val ctx = context ?: throw FileNotFoundException("No context")
+                val handler = Handler(ctx.mainLooper)
                 ParcelFileDescriptor.open(file, accessMode, handler) { e -> e?.printStackTrace() }
             } catch (e: IOException) {
                 throw FileNotFoundException("Failed to open document with id $documentId and mode $mode")
@@ -78,9 +79,9 @@ class InstanceFilesProvider : DocumentsProvider() {
     }
 
     override fun createDocument(documentId: String, mimeType: String, displayName: String): String {
-        val parent = getFileForDocId(documentId)
+        val parent = getFileForDocId(documentId) ?: throw FileNotFoundException("No parent for $documentId")
         val inst = getInstanceForDocId(documentId)
-        val file = File(parent!!.path, displayName)
+        val file = File(parent.path, displayName)
         try {
             file.createNewFile()
             file.setWritable(true)
@@ -88,12 +89,12 @@ class InstanceFilesProvider : DocumentsProvider() {
         } catch (e: IOException) {
             throw FileNotFoundException("Failed to create document with name $displayName and documentId $documentId")
         }
-        return getDocIdForFile(inst!!, file)
+        return getDocIdForFile(inst ?: throw FileNotFoundException("No instance for $documentId"), file)
     }
 
     override fun deleteDocument(documentId: String) {
-        val file = getFileForDocId(documentId)
-        if (!file!!.delete()) {
+        val file = getFileForDocId(documentId) ?: throw FileNotFoundException("No file for $documentId")
+        if (!file.delete()) {
             throw FileNotFoundException("Failed to delete document with id $documentId")
         }
     }
@@ -139,23 +140,25 @@ class InstanceFilesProvider : DocumentsProvider() {
         var id = docId
         var f = file
         if (id == null) {
-            id = getDocIdForFile(inst!!, f!!)
+            f?.let { f2 -> inst?.let { i -> id = getDocIdForFile(i, f2) } }
+                ?: return
         } else {
             f = getFileForDocId(id)
         }
 
+        val fileVal = f ?: return
         var flags = 0
-        if (f!!.isDirectory) {
-            if (f.isDirectory && f.canWrite()) {
+        if (fileVal.isDirectory) {
+            if (fileVal.canWrite()) {
                 flags = flags or DocumentsContract.Document.FLAG_DIR_SUPPORTS_CREATE
             }
-        } else if (f.canWrite()) {
+        } else if (fileVal.canWrite()) {
             flags = flags or DocumentsContract.Document.FLAG_SUPPORTS_WRITE
             flags = flags or DocumentsContract.Document.FLAG_SUPPORTS_DELETE
         }
 
-        val displayName = f.name
-        val mimeType = getTypeForFile(f)
+        val displayName = fileVal.name
+        val mimeType = getTypeForFile(fileVal)
         if (mimeType.startsWith("image/")) {
             flags = flags or DocumentsContract.Document.FLAG_SUPPORTS_THUMBNAIL
         }
@@ -163,9 +166,9 @@ class InstanceFilesProvider : DocumentsProvider() {
         result.newRow().apply {
             add(DocumentsContract.Document.COLUMN_DOCUMENT_ID, id)
             add(DocumentsContract.Document.COLUMN_DISPLAY_NAME, displayName)
-            add(DocumentsContract.Document.COLUMN_SIZE, f.length())
+            add(DocumentsContract.Document.COLUMN_SIZE, fileVal.length())
             add(DocumentsContract.Document.COLUMN_MIME_TYPE, mimeType)
-            add(DocumentsContract.Document.COLUMN_LAST_MODIFIED, f.lastModified())
+            add(DocumentsContract.Document.COLUMN_LAST_MODIFIED, fileVal.lastModified())
             add(DocumentsContract.Document.COLUMN_FLAGS, flags)
             add(DocumentsContract.Document.COLUMN_ICON, R.drawable.icon_static)
         }

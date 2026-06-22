@@ -207,7 +207,7 @@ class WebService : Service() {
                 }
                 "/beam/set_camera_flashlight" -> {
                     if (checkRemote(session)) return Response.newFixedLengthResponse("{\"ok\": false}")
-                    val flashlight = session.parameters.containsKey("enabled") && session.parameters["enabled"]!![0] == "true"
+                    val flashlight = session.parameters.containsKey("enabled") && session.parameters["enabled"]?.get(0) == "true"
                     KlipperApp.INSTANCE.sendBroadcast(
                         Intent(CameraService.ACTION_TOGGLE_FLASHLIGHT).putExtra(CameraService.KEY_FLASHLIGHT, flashlight),
                         KlipperApp.PERMISSION)
@@ -215,9 +215,8 @@ class WebService : Service() {
                 }
                 "/beam/set_camera_focus" -> {
                     if (checkRemote(session)) return Response.newFixedLengthResponse("{\"ok\": false}")
-                    val autofocus = session.parameters.containsKey("autofocus") && session.parameters["autofocus"]!![0] == "true"
-                    val distance = if (session.parameters.containsKey("focus"))
-                        session.parameters["focus"]!![0].toFloat() else 0f
+                    val autofocus = session.parameters.containsKey("autofocus") && session.parameters["autofocus"]?.get(0) == "true"
+                    val distance = session.parameters["focus"]?.get(0)?.toFloatOrNull() ?: 0f
                     KlipperApp.INSTANCE.sendBroadcast(
                         Intent(CameraService.ACTION_TOGGLE_FOCUS)
                             .putExtra(CameraService.KEY_AUTOFOCUS, autofocus)

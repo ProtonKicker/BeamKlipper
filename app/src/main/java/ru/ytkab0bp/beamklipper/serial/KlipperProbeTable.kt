@@ -11,10 +11,12 @@ object KlipperProbeTable {
     @JvmStatic
     fun getInstance(): ProbeTable {
         if (mInstance == null) {
-            mInstance = UsbSerialProber.getDefaultProbeTable()
-            mInstance!!.addProduct(0x1D50, 0x614E, CdcAcmSerialDriver::class.java)
-            mInstance!!.addProduct(0xDD8, 0x3701, Ch34xSerialDriver::class.java)
+            val inst = UsbSerialProber.getDefaultProbeTable()
+            mInstance = inst
+            inst.addProduct(0x1D50, 0x614E, CdcAcmSerialDriver::class.java)
+            inst.addProduct(0xDD8, 0x3701, Ch34xSerialDriver::class.java)
         }
         return mInstance!!
+    }
     }
 }

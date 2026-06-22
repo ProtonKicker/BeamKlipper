@@ -34,9 +34,9 @@ class BeamDB(context: Context?) : SQLiteOpenHelper(context, DB_NAME, null, VERSI
         while (c.moveToNext()) {
             DatabaseUtils.cursorRowToContentValues(c, cv)
             val inst = KlipperInstance()
-            inst.id = cv.getAsString(COLUMN_ID)!!
-            inst.name = cv.getAsString(COLUMN_NAME)!!
-            inst.icon = InstanceIcon.byKey(cv.getAsString(COLUMN_ICON)!!)
+            inst.id = cv.getAsString(COLUMN_ID) ?: continue
+            inst.name = cv.getAsString(COLUMN_NAME) ?: continue
+            inst.icon = InstanceIcon.byKey(cv.getAsString(COLUMN_ICON) ?: continue)
             inst.autostart = cv[COLUMN_AUTOSTART] as? String == "1"
             inst.remoteId = if (cv.containsKey(COLUMN_REMOTE_ID)) cv.getAsString(COLUMN_REMOTE_ID) else null
             inst.remoteToken = if (cv.containsKey(COLUMN_REMOTE_TOKEN)) cv.getAsString(COLUMN_REMOTE_TOKEN) else null
@@ -57,7 +57,7 @@ class BeamDB(context: Context?) : SQLiteOpenHelper(context, DB_NAME, null, VERSI
         }
         writableDatabase.insert(TABLE_INSTANCES, null, cv)
         KlipperInstance.onInstancesLoadedFromDB(getInstances())
-        KlipperApp.EVENT_BUS.fireEvent(InstanceCreatedEvent(inst.id!!))
+        KlipperApp.EVENT_BUS.fireEvent(InstanceCreatedEvent(inst.id ?: return))
     }
 
     fun update(inst: KlipperInstance) {
@@ -71,7 +71,7 @@ class BeamDB(context: Context?) : SQLiteOpenHelper(context, DB_NAME, null, VERSI
         }
         writableDatabase.update(TABLE_INSTANCES, cv, "id = ?", arrayOf(inst.id))
         KlipperInstance.onInstancesLoadedFromDB(getInstances())
-        KlipperApp.EVENT_BUS.fireEvent(InstanceUpdatedEvent(inst.id!!))
+        KlipperApp.EVENT_BUS.fireEvent(InstanceUpdatedEvent(inst.id ?: return))
     }
 
     fun delete(inst: KlipperInstance) {
@@ -81,7 +81,7 @@ class BeamDB(context: Context?) : SQLiteOpenHelper(context, DB_NAME, null, VERSI
         writableDatabase.delete(TABLE_INSTANCES, "id = ?", arrayOf(inst.id))
         KlipperInstance.onInstancesLoadedFromDB(getInstances())
         deleteRecur(inst.directory)
-        KlipperApp.EVENT_BUS.fireEvent(InstanceDestroyedEvent(inst.id!!))
+        KlipperApp.EVENT_BUS.fireEvent(InstanceDestroyedEvent(inst.id ?: return))
     }
 
     companion object {

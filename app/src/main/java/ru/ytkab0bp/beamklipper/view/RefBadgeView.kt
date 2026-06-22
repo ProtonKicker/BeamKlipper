@@ -59,8 +59,6 @@ class RefBadgeView(context: Context) : LinearLayout(context) {
         }
     }
 
-    fun getIconView(): ImageView = icon
-
     override fun draw(canvas: Canvas) {
         path.rewind()
         path.addRoundRect(

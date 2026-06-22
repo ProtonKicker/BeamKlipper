@@ -92,10 +92,11 @@ object LogUploader {
                     }
 
                     override fun onResponse(call: Call, response: Response) {
-                        if (response.header("Location") != null) {
+                        val location = response.header("Location")
+                        if (location != null) {
                             ViewUtils.postOnMainThread {
                                 Toast.makeText(KlipperApp.INSTANCE, R.string.UploadSuccess, Toast.LENGTH_SHORT).show()
-                                var loc = response.header("Location")!!
+                                var loc = location
                                 if (!loc.startsWith("https://")) {
                                     loc = "https://coderus.openrepos.net$loc"
                                 }

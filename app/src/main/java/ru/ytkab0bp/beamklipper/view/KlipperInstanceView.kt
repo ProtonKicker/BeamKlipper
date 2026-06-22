@@ -178,7 +178,7 @@ class KlipperInstanceView(context: Context) : LinearLayout(context) {
         startStopButton.setColorIndex(id.hashCode() % 10)
         startStopButton.setStopped(instance.state != KlipperInstance.State.RUNNING && instance.state != KlipperInstance.State.STOPPING)
         startStopButton.setOnClickListener {
-            val inst = KlipperInstance.getInstance(id!!)
+            val inst = KlipperInstance.getInstance(id ?: return)
             if (inst.state == KlipperInstance.State.STARTING || inst.state == KlipperInstance.State.STOPPING) return@setOnClickListener
 
             if (inst.state == KlipperInstance.State.IDLE) {
@@ -240,7 +240,7 @@ class KlipperInstanceView(context: Context) : LinearLayout(context) {
                 }
             }
         titleSubtitleLayout.translationY = fY
-        visibleAnimation!!.start()
+        visibleAnimation?.start()
     }
 
     @EventHandler(runOnMainThread = true)

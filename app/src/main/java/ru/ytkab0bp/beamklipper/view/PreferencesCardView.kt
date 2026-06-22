@@ -195,7 +195,8 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
                                     if (CloudController.getUserInfo() == null) {
                                         pref.bind(context.getString(R.string.SettingsCloudLoading), null)
                                     } else {
-                                        pref.bind(CloudController.getUserInfo()!!.displayName, context.getString(R.string.SettingsCloudTapToManage))
+                                        val info = CloudController.getUserInfo() ?: return@setOnClickListener
+                                    pref.bind(info.displayName, context.getString(R.string.SettingsCloudTapToManage))
                                     }
                                 }
                                 pref.setOnClickListener {

@@ -34,7 +34,7 @@ class FadeRecyclerView(context: Context) : RecyclerView(context) {
                     topProgress = MathUtils.clamp(-ch.top / size.toFloat(), 0f, 1f)
                 }
                 bottomProgress = 1f
-                if (llm.findLastVisibleItemPosition() == recyclerView.adapter!!.itemCount - 1) {
+                if (llm.findLastVisibleItemPosition() == (recyclerView.adapter?.itemCount ?: return) - 1) {
                     val ch = llm.getChildAt(llm.childCount - 1) ?: return
                     val size = minOf(ch.height, ViewUtils.dp(HEIGHT_DP) / 2)
                     bottomProgress = MathUtils.clamp((ch.bottom - height) / size.toFloat(), 0f, 1f)
@@ -95,7 +95,7 @@ class FadeRecyclerView(context: Context) : RecyclerView(context) {
         }
 
         if (bitmapMode) {
-            c.drawBitmap(bitmap!!, 0f, 0f, null)
+            bitmap?.let { c.drawBitmap(it, 0f, 0f, null) }
             invalidate()
         }
     }

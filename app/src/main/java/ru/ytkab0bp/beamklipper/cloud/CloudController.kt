@@ -147,7 +147,7 @@ object CloudController {
     fun logout() {
         for (inst in KlipperInstance.getInstances()) {
             if (inst.remoteId != null) {
-                CloudAPI.INSTANCE.remoteDeletePrinter(inst.remoteId!!) {}
+                CloudAPI.INSTANCE.remoteDeletePrinter(inst.remoteId ?: continue) {}
                 inst.remoteId = null
                 inst.remoteToken = null
                 KlipperApp.DATABASE.update(inst)
@@ -186,6 +186,8 @@ object CloudController {
     fun getUserFeatures(): CloudAPI.UserFeatures? = userFeatures
 
     @JvmStatic
-    fun hasAccountFeatures(): Boolean =
-        userFeatures != null && userFeatures!!.levels != null && userFeatures!!.levels.isNotEmpty()
+    fun hasAccountFeatures(): Boolean {
+        val f = userFeatures ?: return false
+        return f.levels != null && f.levels.isNotEmpty()
+    }
 }

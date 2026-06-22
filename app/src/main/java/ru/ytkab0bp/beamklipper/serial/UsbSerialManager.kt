@@ -136,7 +136,8 @@ object UsbSerialManager {
         val port = drv.ports[0]
 
         try {
-            port.open(mUsbManager!!.openDevice(drv.device))
+            val usbManager = mUsbManager ?: return
+            port.open(usbManager.openDevice(drv.device))
             port.rts = true
             if (resetArduino) {
                 port.dtr = true

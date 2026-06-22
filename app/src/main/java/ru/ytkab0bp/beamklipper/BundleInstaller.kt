@@ -75,7 +75,7 @@ object BundleInstaller {
         for (i in 0 until arr.length()) {
             val file = arr.optString(i)
             val into = File(dir, file)
-            into.parentFile!!.mkdirs()
+            into.parentFile?.mkdirs()
             assets.open("$key/$file").use { inp ->
                 FileOutputStream(into).use { fos ->
                     val buffer = ByteArray(10240)

@@ -188,15 +188,15 @@ class CameraService : Service() {
                                 try {
                                     captureRequestBuilder = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
                                     val chars = cameraManager.getCameraCharacteristics(camera.id)
-                                    val ranges = chars.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES)!!
+                                    val rangeArray = chars.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES) ?: throw RuntimeException("No FPS ranges")
                                     var selectedRange: Range<Int>? = null
-                                    for (r in ranges) {
+                                    for (r in rangeArray) {
                                         if (r.upper < 25) {
                                             selectedRange = r
                                             break
                                         }
                                     }
-                                    if (selectedRange == null) selectedRange = ranges[0]
+                                    if (selectedRange == null) selectedRange = rangeArray[0]
                                     captureRequestBuilder!!.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, selectedRange)
                                     captureRequestBuilder!!.set(CaptureRequest.FLASH_MODE,
                                         if (Prefs.isFlashlightEnabled) CaptureRequest.FLASH_MODE_TORCH else CaptureRequest.FLASH_MODE_OFF)

@@ -84,9 +84,10 @@ class KlipperInstance {
         }
         slots[this] = slot
         try {
-            klippyIntent = Intent(KlipperApp.INSTANCE, Class.forName("ru.ytkab0bp.beamklipper.service.KlippyService_$slot"))
-            klippyIntent!!.putExtra(BasePythonService.KEY_INSTANCE, id)
-            KlipperApp.INSTANCE.bindService(klippyIntent!!, object : ServiceConnection {
+            val kIntent = Intent(KlipperApp.INSTANCE, Class.forName("ru.ytkab0bp.beamklipper.service.KlippyService_$slot"))
+            klippyIntent = kIntent
+            kIntent.putExtra(BasePythonService.KEY_INSTANCE, id)
+            KlipperApp.INSTANCE.bindService(kIntent, object : ServiceConnection {
                 override fun onServiceConnected(name: ComponentName, service: IBinder) {
                     klippyConnected = true
                     if (moonrakerConnected) {
@@ -100,9 +101,10 @@ class KlipperInstance {
             throw RuntimeException(e)
         }
         try {
-            moonrakerIntent = Intent(KlipperApp.INSTANCE, Class.forName("ru.ytkab0bp.beamklipper.service.MoonrakerService_$slot"))
-            moonrakerIntent!!.putExtra(BasePythonService.KEY_INSTANCE, id)
-            KlipperApp.INSTANCE.bindService(moonrakerIntent!!, object : ServiceConnection {
+            val mIntent = Intent(KlipperApp.INSTANCE, Class.forName("ru.ytkab0bp.beamklipper.service.MoonrakerService_$slot"))
+            moonrakerIntent = mIntent
+            mIntent.putExtra(BasePythonService.KEY_INSTANCE, id)
+            KlipperApp.INSTANCE.bindService(mIntent, object : ServiceConnection {
                 override fun onServiceConnected(name: ComponentName, service: IBinder) {
                     moonrakerConnected = true
                     if (klippyConnected) {
@@ -121,7 +123,7 @@ class KlipperInstance {
                 val s = BaseMoonrakerService.readString(f)
                 val m = BaseMoonrakerService.MOONRAKER_PORT_PATTERN.matcher(s)
                 if (m.find()) {
-                    val port = m.group(1)!!.toInt()
+                    val port = m.group(1)?.toInt() ?: throw IOException("No port group")
                     remoteBeamConnection = RemoteBeamConnection(remoteToken, "http://127.0.0.1:8888", "127.0.0.1:$port", object : RemoteBeamConnection.EventListener {
                         override fun onConnected(conn: RemoteBeamConnection) {
                             Log.d(TAG, "Remote connected")
@@ -139,7 +141,7 @@ class KlipperInstance {
                             Log.d(TAG, "Remote disconnected")
                         }
                     })
-                    remoteBeamConnection!!.connect()
+                    remoteBeamConnection?.connect()
                 } else {
                     throw IOException("No match")
                 }
@@ -188,7 +190,7 @@ class KlipperInstance {
 
     private fun notifyStateChanged(state: State) {
         this.state = state
-        KlipperApp.EVENT_BUS.fireEvent(InstanceStateChangedEvent(id!!, state))
+        KlipperApp.EVENT_BUS.fireEvent(InstanceStateChangedEvent(requireNotNull(id), state))
 
         if (state == State.IDLE) {
             slots.remove(this)
@@ -260,7 +262,7 @@ class KlipperInstance {
         @JvmStatic
         fun onInstancesLoadedFromDB(loaded: List<KlipperInstance>) {
             for (inst in loaded) {
-                val was = getInstance(inst.id!!)
+                val was = getInstance(inst.id ?: continue)
                 if (was != null) {
                     inst.state = was.state
                     inst.klippyConnection = was.klippyConnection

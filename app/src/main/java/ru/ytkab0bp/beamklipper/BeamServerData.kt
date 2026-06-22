@@ -52,7 +52,7 @@ object BeamServerData {
     fun load() {
         client.get(DATA_URL, object : AsyncHttpResponseHandler() {
             override fun onSuccess(statusCode: Int, headers: Array<out cz.msebera.android.httpclient.Header>?, responseBody: ByteArray?) {
-                val str = String(responseBody!!, Charsets.UTF_8)
+                val str = String(responseBody ?: return, Charsets.UTF_8)
                 Prefs.beamServerData = str
                 Prefs.setLastCheckedInfo()
 
@@ -61,7 +61,7 @@ object BeamServerData {
                 if (BuildConfig.IS_GOOGLE_PLAY) {
                     client.get(RUSSIA_CHECK_URL, object : AsyncHttpResponseHandler() {
                         override fun onSuccess(statusCode: Int, headers: Array<out cz.msebera.android.httpclient.Header>?, responseBody: ByteArray?) {
-                            setIsRussia(String(responseBody!!, Charsets.UTF_8) == "true")
+                            setIsRussia(String(responseBody ?: return, Charsets.UTF_8) == "true")
                         }
 
                         override fun onFailure(statusCode: Int, headers: Array<out cz.msebera.android.httpclient.Header>?, responseBody: ByteArray?, error: Throwable?) {

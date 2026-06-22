@@ -58,7 +58,7 @@ object ViewUtils {
     @JvmStatic
     fun resolveDrawable(ctx: Context, attr: Int): Drawable {
         val arr = ctx.obtainStyledAttributes(intArrayOf(attr))
-        val d = arr.getDrawable(0)!!
+        val d = arr.getDrawable(0) ?: throw RuntimeException("Failed to resolve drawable attr $attr")
         arr.recycle()
         return d
     }

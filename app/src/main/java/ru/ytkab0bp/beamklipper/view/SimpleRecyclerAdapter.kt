@@ -14,7 +14,8 @@ class SimpleRecyclerAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
         }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-        return object : RecyclerView.ViewHolder(viewCreator[viewType]!!.onCreateView(parent.context)) {}
+        val creator = viewCreator[viewType] ?: error("Unknown viewType $viewType")
+        return object : RecyclerView.ViewHolder(creator.onCreateView(parent.context)) {}
     }
 
     @Suppress("UNCHECKED_CAST")

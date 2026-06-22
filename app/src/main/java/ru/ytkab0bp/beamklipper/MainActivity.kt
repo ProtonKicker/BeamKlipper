@@ -210,7 +210,8 @@ class MainActivity : AppCompatActivity() {
                 override fun onDraw(c: Canvas, parent: RecyclerView, state: RecyclerView.State) {
                     for (i in 0 until parent.childCount) {
                         val child = parent.getChildAt(i)
-                        if (parent.getChildViewHolder(child).adapterPosition != adapter!!.itemCount - 1) {
+                        val itemCountVal = adapter?.itemCount ?: continue
+                        if (parent.getChildViewHolder(child).adapterPosition != itemCountVal - 1) {
                             c.drawLine(
                                 ViewUtils.dp(1.5f), child.y + child.height - ViewUtils.dp(1),
                                 child.width - ViewUtils.dp(1.5f), child.y + child.height - ViewUtils.dp(1),
@@ -460,14 +461,16 @@ class MainActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(52))
             setOnClickListener {
                 if (isRequestingRemoteToken) return@setOnClickListener
+                val features = CloudController.getUserFeatures()
+                val userInfo = CloudController.getUserInfo()
                 if (Prefs.cloudApiToken == null ||
-                    CloudController.getUserFeatures() != null &&
-                    CloudController.getUserFeatures()!!.remoteAccessLevel != -1 &&
-                    CloudController.getUserInfo() != null &&
-                    CloudController.getUserInfo()!!.currentLevel < CloudController.getUserFeatures()!!.remoteAccessLevel
+                    features != null &&
+                    features.remoteAccessLevel != -1 &&
+                    userInfo != null &&
+                    userInfo.currentLevel < features.remoteAccessLevel
                 ) {
                     startActivity(Intent(this@MainActivity, CloudActivity::class.java))
-                } else if (CloudController.getUserInfo() == null) {
+                } else if (userInfo == null) {
                     Toast.makeText(this@MainActivity, R.string.BeamRemoteAccessStillLoading, Toast.LENGTH_SHORT).show()
                 } else {
                     if (editInstance!!.remoteId != null) {
@@ -483,7 +486,8 @@ class MainActivity : AppCompatActivity() {
                     isRequestingRemoteToken = true
                     CloudAPI.INSTANCE.remoteGetPrinters(object : APICallback<List<CloudAPI.RemotePrinter>> {
                         override fun onResponse(response: List<CloudAPI.RemotePrinter>) {
-                            if (response.size >= CloudController.getUserFeatures()!!.remoteAccessPrintersLimit) {
+                            val respFeatures = CloudController.getUserFeatures() ?: return@setOnClickListener
+                            if (response.size >= respFeatures.remoteAccessPrintersLimit) {
                                 isRequestingRemoteToken = false
                                 ViewUtils.postOnMainThread {
                                     val items = response.map { it.name as CharSequence }.toTypedArray()
@@ -614,7 +618,7 @@ class MainActivity : AppCompatActivity() {
                     autostart = autostartRow.isChecked
                 }
                 val cfg = File(inst.publicDirectory, "config/printer.cfg")
-                cfg.parentFile!!.mkdirs()
+                cfg.parentFile?.mkdirs()
                 try {
                     FileInputStream(File(KlipperApp.INSTANCE.filesDir, "klipper/config/${configRow.text}")).use { fis ->
                         FileOutputStream(cfg).use { fos ->
@@ -800,7 +804,8 @@ class MainActivity : AppCompatActivity() {
 
                 val isLast = if (focusInList) {
                     val focus = listView.findFocus()
-                    focus != null && listView.getChildViewHolder(focus).adapterPosition == listView.adapter!!.itemCount - 1
+                    val adapterCount = listView.adapter?.itemCount ?: return false
+                    focus != null && listView.getChildViewHolder(focus).adapterPosition == adapterCount - 1
                 } else {
                     badgesLayout.findFocus() == refBadges.lastOrNull()
                 }
@@ -890,13 +895,13 @@ class MainActivity : AppCompatActivity() {
 
     @EventHandler(runOnMainThread = true)
     fun onFrontendChanged(e: WebFrontendChangedEvent) {
-        listView.adapter!!.notifyItemChanged(1)
+        listView.adapter?.notifyItemChanged(1)
     }
 
     @EventHandler(runOnMainThread = true)
     fun onInstanceCreated(e: InstanceCreatedEvent) {
         instances.add(KlipperInstance.getInstance(e.id) ?: return)
-        listView.adapter!!.notifyItemInserted(listView.adapter!!.itemCount - 2)
+        listView.adapter?.notifyItemInserted((listView.adapter?.itemCount ?: 0) - 2)
     }
 
     @EventHandler(runOnMainThread = true)
@@ -910,7 +915,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         if (idx != -1) {
-            listView.adapter!!.notifyItemChanged(idx + 2, NOTIFY_LIVE)
+            listView.adapter?.notifyItemChanged(idx + 2, NOTIFY_LIVE)
         }
     }
 
@@ -925,7 +930,7 @@ class MainActivity : AppCompatActivity() {
         }
         if (idx != -1) {
             instances.removeAt(idx)
-            listView.adapter!!.notifyItemRemoved(idx + 2)
+            listView.adapter?.notifyItemRemoved(idx + 2)
         }
     }
 
@@ -964,14 +969,14 @@ class MainActivity : AppCompatActivity() {
                     if (editInstance != null) {
                         editInstance = null
                         if (pendingRemotePrinter != null) {
-                            CloudAPI.INSTANCE.remoteDeletePrinter(pendingRemotePrinter!!.id) {}
+                            CloudAPI.INSTANCE.remoteDeletePrinter(pendingRemotePrinter?.id ?: return) {}
                             pendingRemotePrinter = null
                         }
                     }
                 }
                 newOrEditAnimation = null
             }
-        newOrEditAnimation!!.start()
+        newOrEditAnimation?.start()
     }
 
     private fun animateHomeView() {

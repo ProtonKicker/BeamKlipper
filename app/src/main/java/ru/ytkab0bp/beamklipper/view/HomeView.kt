@@ -34,9 +34,9 @@ class HomeView(context: Context) : FrameLayout(context) {
         gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
             override fun onScroll(e1: MotionEvent?, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
                 if (!processingSwipe && !isTouchDisabled) {
-                    if (progress == 0f && scrollView != null && scrollView!!.canScrollVertically(if (e1!!.y - e2.y > 0) 1 else -1)) {
+                    if (progress == 0f && scrollView != null && scrollView!!.canScrollVertically(if ((e1?.y ?: e2.y) - e2.y > 0) 1 else -1)) {
                         isTouchDisabled = true
-                    } else if (animation == null && Math.abs(e2.y - e1!!.y) >= touchSlop && Math.abs(distanceY) >= Math.abs(distanceX) * 1.5f) {
+                    } else if (animation == null && Math.abs(e2.y - (e1?.y ?: e2.y)) >= touchSlop && Math.abs(distanceY) >= Math.abs(distanceX) * 1.5f) {
                         startOffset = e2.y - e1.y
                         startProgress = progress
                         processingSwipe = true
@@ -53,7 +53,7 @@ class HomeView(context: Context) : FrameLayout(context) {
                 }
                 if (processingSwipe) {
                     progress = MathUtils.clamp(
-                        startProgress + (e2.y - e1!!.y - startOffset) / height,
+                        startProgress + (e2.y - (e1?.y ?: e2.y) - startOffset) / height,
                         if (SETTINGS_ENABLED) -1f else 0f, 1f)
                     invalidateProgress()
                 }

@@ -34,8 +34,10 @@ class SmoothResizeFrameLayout : FrameLayout {
     }
 
     private fun invalidateSize() {
-        val w = widthValue!!.value.toInt()
-        val h = heightValue!!.value.toInt()
+        val wv = widthValue ?: return
+        val hv = heightValue ?: return
+        val w = wv.value.toInt()
+        val h = hv.value.toInt()
         if (measuredWidth == w && measuredHeight == h) return
         setMeasuredDimension(w, h)
         requestLayout()
@@ -138,24 +140,24 @@ class SmoothResizeFrameLayout : FrameLayout {
             return
         }
 
-        if (mWidthSpring != null && mHeightSpring != null) {
-            if (mWidthSpring!!.spring.finalPosition != 0f) {
-                mWidthSpring!!.spring.finalPosition = measuredWidth.toFloat()
-                mWidthSpring!!.start()
-            } else {
-                mWidthSpring!!.cancel()
-                mWidthSpring!!.spring.finalPosition = measuredWidth.toFloat()
-                widthValue!!.value = measuredWidth.toFloat()
-            }
-            if (mHeightSpring!!.spring.finalPosition != 0f) {
-                mHeightSpring!!.spring.finalPosition = measuredHeight.toFloat()
-                mHeightSpring!!.start()
-            } else {
-                mHeightSpring!!.cancel()
-                mHeightSpring!!.spring.finalPosition = measuredHeight.toFloat()
-                heightValue!!.value = measuredHeight.toFloat()
-            }
-            setMeasuredDimension(widthValue!!.value.toInt(), heightValue!!.value.toInt())
+        val ws = mWidthSpring ?: return
+        val hs = mHeightSpring ?: return
+        if (ws.spring.finalPosition != 0f) {
+            ws.spring.finalPosition = measuredWidth.toFloat()
+            ws.start()
+        } else {
+            ws.cancel()
+            ws.spring.finalPosition = measuredWidth.toFloat()
+            (widthValue ?: return).value = measuredWidth.toFloat()
         }
+        if (hs.spring.finalPosition != 0f) {
+            hs.spring.finalPosition = measuredHeight.toFloat()
+            hs.start()
+        } else {
+            hs.cancel()
+            hs.spring.finalPosition = measuredHeight.toFloat()
+            (heightValue ?: return).value = measuredHeight.toFloat()
+        }
+        setMeasuredDimension((widthValue?.value ?: return).toInt(), (heightValue?.value ?: return).toInt())
     }
 }

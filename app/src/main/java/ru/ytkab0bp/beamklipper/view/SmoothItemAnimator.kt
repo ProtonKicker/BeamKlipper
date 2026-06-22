@@ -85,7 +85,8 @@ class SmoothItemAnimator : SimpleItemAnimator() {
                 mChangesList.remove(changes)
             }
             if (removalsPending) {
-                ViewCompat.postOnAnimationDelayed(changes[0].oldHolder!!.itemView, changer, removeDuration)
+                changes[0].oldHolder?.itemView?.let { ViewCompat.postOnAnimationDelayed(it, changer, removeDuration) }
+                    ?: return
             } else {
                 changer.run()
             }

@@ -135,8 +135,9 @@ class ChangeLogBottomSheet(context: Context) : BottomSheetDialog(context) {
                         })
 
                         subsView = BoostySubsView(context).apply {
-                            if (BeamServerData.SERVER_DATA != null) {
-                                val list = ArrayList(BeamServerData.SERVER_DATA!!.boostySubscribers)
+                            val sd = BeamServerData.SERVER_DATA
+                            if (sd != null) {
+                                val list = ArrayList(sd.boostySubscribers)
                                 Collections.shuffle(list)
                                 setStrings(list)
                             }
@@ -225,8 +226,9 @@ class ChangeLogBottomSheet(context: Context) : BottomSheetDialog(context) {
 
     @EventHandler(runOnMainThread = true)
     fun onDataUpdated(e: BeamServerDataUpdatedEvent) {
-        if (BeamServerData.SERVER_DATA != null) {
-            val list = ArrayList(BeamServerData.SERVER_DATA!!.boostySubscribers)
+        val sd = BeamServerData.SERVER_DATA
+        if (sd != null) {
+            val list = ArrayList(sd.boostySubscribers)
             Collections.shuffle(list)
             subsView?.setStrings(list)
         }
