@@ -28,13 +28,13 @@ class SmoothItemAnimator : SimpleItemAnimator() {
     internal val mRemoveAnimations = ArrayList<RecyclerView.ViewHolder>()
     internal val mChangeAnimations = ArrayList<RecyclerView.ViewHolder>()
 
-    private class MoveInfo(
+    internal class MoveInfo(
         var holder: RecyclerView.ViewHolder,
         var fromX: Int, var fromY: Int,
         var toX: Int, var toY: Int
     )
 
-    private class ChangeInfo(
+    internal class ChangeInfo(
         var oldHolder: RecyclerView.ViewHolder?,
         var newHolder: RecyclerView.ViewHolder?,
         var fromX: Int = 0, var fromY: Int = 0,

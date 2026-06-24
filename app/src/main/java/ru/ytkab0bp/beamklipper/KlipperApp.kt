@@ -73,10 +73,8 @@ class KlipperApp : Application() {
         @JvmField
         val SERVICES_CHANNEL = "services"
 
-        @JvmField
-        var INSTANCE: KlipperApp = null!!
-        @JvmField
-        var DATABASE: BeamDB = null!!
+        lateinit var INSTANCE: KlipperApp
+        lateinit var DATABASE: BeamDB
         @JvmField
         var EVENT_BUS: EventBus = EventBus.newBus("main")
         @JvmField

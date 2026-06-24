@@ -19,8 +19,7 @@ object BeamServerData {
     var SERVER_DATA: ServerData? = null
 
     init {
-        client.userAgent = String.format(Locale.ROOT, "BeamKlipper/%s-%d", BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE)
-        client.isEnableRedirects = true
+        client.addHeader("User-Agent", String.format(Locale.ROOT, "BeamKlipper/%s-%d", BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE))
         client.setLoggingEnabled(false)
     }
 

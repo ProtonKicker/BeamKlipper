@@ -13,7 +13,7 @@ import ru.ytkab0bp.sapil.Method
 interface CloudAPI : APIRunner {
     companion object {
         @JvmField
-        val INSTANCE: CloudAPI = APILibrary.newRunner(CloudAPI::class.java, object : RunnerConfig() {
+        val INSTANCE: CloudAPI = APILibrary.newRunner(CloudAPI::class.java, object : APIRunner.RunnerConfig {
             private val headers = HashMap<String, String>()
 
             override fun getBaseURL(): String = "https://api.beam3d.ru/v1/"

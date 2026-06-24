@@ -23,6 +23,21 @@ open class BaseMoonrakerService(private val num: Int) : BasePythonService() {
     companion object {
         const val BASE_ID = 200000
         @JvmField val MOONRAKER_PORT_PATTERN = Pattern.compile("port: (\\d+)")
+
+        @JvmStatic
+        @Throws(IOException::class)
+        fun readString(file: File): String {
+            val input = FileInputStream(file)
+            val bos = ByteArrayOutputStream()
+            val buffer = ByteArray(10240)
+            var c: Int
+            while (input.read(buffer).also { c = it } != -1) {
+                bos.write(buffer, 0, c)
+            }
+            input.close()
+            bos.close()
+            return bos.toString()
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? {
@@ -109,18 +124,4 @@ open class BaseMoonrakerService(private val num: Int) : BasePythonService() {
         }
     }
 
-    @JvmStatic
-    @Throws(IOException::class)
-    fun readString(file: File): String {
-        val input = FileInputStream(file)
-        val bos = ByteArrayOutputStream()
-        val buffer = ByteArray(10240)
-        var c: Int
-        while (input.read(buffer).also { c = it } != -1) {
-            bos.write(buffer, 0, c)
-        }
-        input.close()
-        bos.close()
-        return bos.toString()
-    }
 }

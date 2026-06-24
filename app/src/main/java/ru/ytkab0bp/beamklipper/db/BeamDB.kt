@@ -75,8 +75,9 @@ class BeamDB(context: Context?) : SQLiteOpenHelper(context, DB_NAME, null, VERSI
     }
 
     fun delete(inst: KlipperInstance) {
-        if (inst.remoteId != null) {
-            CloudAPI.INSTANCE.remoteDeletePrinter(inst.remoteId) {}
+        val remoteId = inst.remoteId
+        if (remoteId != null) {
+            CloudAPI.INSTANCE.remoteDeletePrinter(remoteId) {}
         }
         writableDatabase.delete(TABLE_INSTANCES, "id = ?", arrayOf(inst.id))
         KlipperInstance.onInstancesLoadedFromDB(getInstances())

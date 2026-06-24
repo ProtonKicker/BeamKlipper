@@ -40,7 +40,7 @@ object LogUploader {
             if (klippyLog.exists()) {
                 tar.putNextEntry(TarEntry(object : TarHeader() {
                     init {
-                        mode = 0o100644
+                        mode = 33188
                         name.append("klippy.log")
                         size = klippyLog.length()
                     }
@@ -57,7 +57,7 @@ object LogUploader {
                 tempStream.reset()
                 tar.putNextEntry(TarEntry(object : TarHeader() {
                     init {
-                        mode = 0o100644
+                        mode = 33188
                         name.append("moonraker.log")
                         size = moonrakerLog.length()
                     }

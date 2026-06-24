@@ -34,7 +34,7 @@ class BeamCamera:
             data = response.read()
             response.close()
         except Exception:
-            logging.exception('Failed to make a request to set_camera_flashlight')
+            logging.exception('Failed to make a request to set_camera_focus')
 
 def load_config(config):
     return BeamCamera(config)

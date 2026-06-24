@@ -87,7 +87,7 @@ class GLNoiseView(context: Context) : GLSurfaceView(context) {
     }
 
     private fun drawTexture() {
-        val shader = shadersManager.current ?: return
+        val shader = shadersManager.getCurrent() ?: return
         val posHandle = shader.getAttribLocation("v_position")
         if (posHandle != -1) {
             glVertexAttribPointer(posHandle, COORDINATES_PER_VERTEX, GL_FLOAT, false,

@@ -1,6 +1,7 @@
 package ru.ytkab0bp.beamklipper.view
 
 import android.view.ViewGroup
+import android.view.View
 import androidx.recyclerview.widget.RecyclerView
 
 class SimpleRecyclerAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
@@ -20,7 +21,7 @@ class SimpleRecyclerAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     @Suppress("UNCHECKED_CAST")
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-        (items[position] as SimpleRecyclerItem<RecyclerView.ViewHolder>).onBindView(holder.itemView)
+        (items[position] as SimpleRecyclerItem<View>).onBindView(holder.itemView)
     }
 
     override fun getItemId(position: Int): Long = items[position].hashCode().toLong()

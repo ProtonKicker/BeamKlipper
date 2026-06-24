@@ -31,6 +31,7 @@ import org.nanohttpd.protocols.websockets.OpCode
 import org.nanohttpd.protocols.websockets.WebSocket
 import org.nanohttpd.protocols.websockets.WebSocketFrame
 import ru.ytkab0bp.beamklipper.KlipperApp
+import ru.ytkab0bp.beamklipper.KlipperInstance
 import ru.ytkab0bp.beamklipper.R
 import ru.ytkab0bp.beamklipper.serial.KlipperProbeTable
 import ru.ytkab0bp.beamklipper.serial.UsbSerialManager
@@ -58,6 +59,7 @@ class WebService : Service() {
         private val API_PATTERN = Pattern.compile("^/(printer|api|access|machine|server)/")
         private var mPrefs: SharedPreferences? = null
         private val dateFormat = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.ROOT)
+        private val MOONRAKER_PORT_RE = Regex("port: (\\d+)")
 
         init {
             System.loadLibrary("beeper")
@@ -79,7 +81,7 @@ class WebService : Service() {
             .setContentText(getString(R.string.WebDescription))
             .setSmallIcon(R.drawable.icon_adaptive_foreground)
             .setOngoing(true)
-        notificationManager.notify(ID, not.build())
+        notificationManager!!.notify(ID, not.build())
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(ID, not.build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         } else {
@@ -108,6 +110,21 @@ class WebService : Service() {
         beeperHandler = null
         stopForeground(true)
         notificationManager?.cancel(ID)
+    }
+
+    private fun getMoonrakerPort(): Int {
+        for (inst in KlipperInstance.getInstances()) {
+            if (inst.getState() == KlipperInstance.State.RUNNING) {
+                val cfg = File(inst.publicDirectory, "config/moonraker.conf")
+                if (cfg.exists()) {
+                    try {
+                        val m = MOONRAKER_PORT_RE.find(cfg.readText())
+                        if (m != null) return m.groupValues[1].toInt()
+                    } catch (_: Exception) {}
+                }
+            }
+        }
+        return 7125
     }
 
     private external fun generateTone(numSamples: Int, freq: Float): FloatArray
@@ -229,9 +246,9 @@ class WebService : Service() {
             val m = API_PATTERN.matcher(session.uri)
             if (m.find()) {
                 try {
-                    val con = URL("http://127.0.0.1:7125/${session.uri.substring(1)}?${session.queryParameterString}")
+                    val con = URL("http://127.0.0.1:${getMoonrakerPort()}/${session.uri.substring(1)}?${session.queryParameterString}")
                         .openConnection() as HttpURLConnection
-                    con.requestMethod = session.method.name()
+                    con.requestMethod = session.method.name
                     if (session.method == Method.POST || session.method == Method.PUT || session.method == Method.PATCH) {
                         for ((key, value) in session.headers) {
                             con.addRequestProperty(key, value)
@@ -256,7 +273,7 @@ class WebService : Service() {
                             r.addHeader(key, value)
                         }
                     }
-                    r.isKeepAlive = false
+                    r.addHeader("Connection", "close")
                     return r
                 } catch (e: IOException) {
                     throw RuntimeException(e)
@@ -273,7 +290,7 @@ class WebService : Service() {
         override fun openWebSocket(handshake: IHTTPSession): WebSocket? {
             return try {
                 val localRef = AtomicReference<WebSocket>()
-                val remote: WebSocketClient = object : WebSocketClient(URI("ws://127.0.0.1:7125/websocket?${handshake.queryParameterString}")) {
+                val remote: WebSocketClient = object : WebSocketClient(URI("ws://127.0.0.1:${getMoonrakerPort()}/websocket?${handshake.queryParameterString}")) {
                     override fun onOpen(handshakedata: ServerHandshake) {}
                     override fun onMessage(message: String) {
                         if (!localRef.get().isOpen) { close(); return }

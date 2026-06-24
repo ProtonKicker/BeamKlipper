@@ -1,5 +1,6 @@
 package ru.ytkab0bp.beamklipper.view
 
+import android.util.Log
 import ru.ytkab0bp.beamklipper.KlipperApp
 import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
@@ -35,13 +36,14 @@ class GLShadersManager {
                         read(KlipperApp.INSTANCE.assets.open("shaders/$key.vs")),
                         read(KlipperApp.INSTANCE.assets.open("shaders/$key.fs")))
                     break
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    Log.w("GLShaders", "Failed to load shader $key", e)
                     tries++
                 }
             }
-            shaders[key] = shader
+            if (shader != null) shaders[key] = shader
         }
-        return shader
+        return shader!!
     }
 
     fun getCurrent(): GLShader? = if (shaderStack.isEmpty()) null else shaderStack.peek()

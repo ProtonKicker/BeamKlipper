@@ -33,7 +33,7 @@ class BeamButton(context: Context) : AppCompatTextView(context) {
     fun onApplyTheme() {
         background = ViewUtils.createRipple(
             ViewUtils.resolveColor(context, android.R.attr.colorControlHighlight),
-            if (colorRes != 0) ViewUtils.resolveColor(context, colorRes) else color, 16)
+            if (colorRes != 0) ViewUtils.resolveColor(context, colorRes) else color, 16f)
         setTextColor(ViewUtils.resolveColor(context, R.attr.textColorOnAccent))
     }
 }

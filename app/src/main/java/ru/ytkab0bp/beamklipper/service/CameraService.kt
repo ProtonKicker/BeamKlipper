@@ -28,6 +28,7 @@ import android.os.IBinder
 import android.os.PowerManager
 import android.os.Process
 import android.util.Log
+import android.util.Range
 import android.view.Surface
 import ru.ytkab0bp.beamklipper.BuildConfig
 import ru.ytkab0bp.beamklipper.KlipperApp
@@ -113,7 +114,7 @@ class CameraService : Service() {
             .setContentText(getString(R.string.CameraDescription))
             .setSmallIcon(R.drawable.icon_adaptive_foreground)
             .setOngoing(true)
-        notificationManager.notify(ID, not.build())
+        notificationManager!!.notify(ID, not.build())
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(ID, not.build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA)
         } else {
@@ -233,9 +234,9 @@ class CameraService : Service() {
 
         val filter = IntentFilter(ACTION_TOGGLE_FLASHLIGHT).apply { addAction(ACTION_TOGGLE_FOCUS) }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(receiver, filter, KlipperApp.PERMISSION, ViewUtils.uiHandler, Context.RECEIVER_EXPORTED)
+            registerReceiver(receiver, filter, KlipperApp.PERMISSION, ViewUtils.getUiHandler(), Context.RECEIVER_EXPORTED)
         } else {
-            registerReceiver(receiver, filter, KlipperApp.PERMISSION, ViewUtils.uiHandler)
+            registerReceiver(receiver, filter, KlipperApp.PERMISSION, ViewUtils.getUiHandler())
         }
     }
 

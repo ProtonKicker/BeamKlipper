@@ -32,7 +32,7 @@ class StartStopButton : AppCompatImageView {
         setImageResource(R.drawable.ic_play_28)
         setWillNotDraw(false)
         background = ViewUtils.createRipple(
-            ViewUtils.resolveColor(context, android.R.attr.colorControlHighlight), MIN_RADIUS)
+            ViewUtils.resolveColor(context, android.R.attr.colorControlHighlight), MIN_RADIUS.toFloat())
         colorFilter = PorterDuffColorFilter(
             ViewUtils.resolveColor(context, R.attr.startStopButtonForegroundColor), PorterDuff.Mode.SRC_IN)
         invalidate()
@@ -58,7 +58,7 @@ class StartStopButton : AppCompatImageView {
 
     override fun draw(canvas: Canvas) {
         path.rewind()
-        val rad = ViewUtils.dp(ViewUtils.lerp(DEFAULT_RADIUS.toFloat(), MIN_RADIUS.toFloat(), progress))
+        val rad = ViewUtils.dp(ViewUtils.lerp(DEFAULT_RADIUS.toFloat(), MIN_RADIUS.toFloat(), progress)).toFloat()
         path.addRoundRect(0f, 0f, width.toFloat(), height.toFloat(), rad, rad, Path.Direction.CW)
         canvas.save()
         canvas.clipPath(path)
@@ -100,7 +100,7 @@ class StartStopButton : AppCompatImageView {
                 }
                 setProgress(value)
             }
-            .addEndListener { spring = null }
+            .addEndListener { _, _, _, _ -> spring = null }
         spring?.start()
     }
 

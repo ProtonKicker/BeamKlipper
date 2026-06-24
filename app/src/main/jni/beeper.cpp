@@ -20,7 +20,7 @@ extern "C" {
 
         min = min(numSamples, period);
         for (int i = period; i < numSamples; i += period) {
-            memcpy(sample + i, sample, sizeof(double) * min(numSamples - i, period));
+            memcpy(sample + i, sample, sizeof(float) * min(numSamples - i, period));
         }
         env->ReleaseFloatArrayElements(arr, sample, JNI_ABORT);
 

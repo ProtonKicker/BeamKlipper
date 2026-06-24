@@ -41,7 +41,7 @@ class CloudPreferenceItem : SimpleRecyclerItem<CloudPreferenceItem.PreferenceHol
     }
 
     fun setSubtitle(subtitle: CharSequence): CloudPreferenceItem {
-        mSubtitle = ValueProvider { subtitle }
+        mSubtitle = object : ValueProvider { override fun provide() = subtitle }
         return this
     }
 
@@ -66,7 +66,7 @@ class CloudPreferenceItem : SimpleRecyclerItem<CloudPreferenceItem.PreferenceHol
     }
 
     fun setValue(text: String): CloudPreferenceItem {
-        valueProvider = ValueProvider { text }
+        valueProvider = object : ValueProvider { override fun provide() = text }
         return this
     }
 
@@ -242,7 +242,7 @@ class CloudPreferenceItem : SimpleRecyclerItem<CloudPreferenceItem.PreferenceHol
                 if (dark) 0x99FFFFFF.toInt() else ViewUtils.resolveColor(context, android.R.attr.textColorSecondary)
             )
             background = ViewUtils.createRipple(
-                if (dark) 0x21FFFFFF.toInt() else ViewUtils.resolveColor(context, android.R.attr.colorControlHighlight), 16
+                if (dark) 0x21FFFFFF.toInt() else ViewUtils.resolveColor(context, android.R.attr.colorControlHighlight), 16f
             )
         }
     }

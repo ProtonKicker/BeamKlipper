@@ -244,12 +244,12 @@ class KlipperInstance {
         private var cameraServerConnection: ServiceConnection? = null
         private var instances: List<KlipperInstance> = emptyList()
         private val instanceMap = object : HashMap<String, KlipperInstance>() {
-            override fun get(key: Any?): KlipperInstance? {
+            override fun get(key: String): KlipperInstance? {
                 var inst = super.get(key)
                 if (inst == null) {
                     for (i in instances) {
                         if (key == i.id) {
-                            put(key as String, i)
+                            put(key, i)
                             inst = i
                             break
                         }

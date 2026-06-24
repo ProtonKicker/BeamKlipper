@@ -8,8 +8,8 @@ import android.net.Uri
 import android.view.Gravity
 import android.widget.FrameLayout
 import android.widget.ImageView
-import androidmds.library.qrgenearator.QRGContents
-import androidmds.library.qrgenearator.QRGEncoder
+import androidmads.library.qrgenearator.QRGContents
+import androidmads.library.qrgenearator.QRGEncoder
 import androidx.annotation.NonNull
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import ru.ytkab0bp.beamklipper.R

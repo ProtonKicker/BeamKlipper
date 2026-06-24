@@ -36,20 +36,29 @@ open class BasePythonService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        android.os.Process.setThreadPriority(-20)
+        android.os.Process.setThreadPriority(-4)
         notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         pythonThread = HandlerThread(javaClass.name).also { it.start() }
         pythonHandler = Handler(pythonThread!!.looper)
         pythonHandler?.post {
-            android.os.Process.setThreadPriority(-20)
+            android.os.Process.setThreadPriority(-4)
             val platform = AndroidPlatform(this@BasePythonService)
-            while (true) {
+            var retries = 0
+            while (retries < 10) {
                 try {
                     platform.path
                     Python.start(platform)
                     py = Python.getInstance()
                     break
-                } catch (_: Exception) {}
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to start Python (attempt ${retries + 1}/10)", e)
+                    retries++
+                    try { Thread.sleep(500) } catch (_: InterruptedException) {}
+                }
+            }
+            if (py == null) {
+                Log.e(TAG, "Failed to start Python after 10 attempts, stopping service")
+                stopSelf()
             }
         }
     }
@@ -66,9 +75,9 @@ open class BasePythonService : Service() {
 
     protected fun runPython(dir: File, module: String, vararg args: String) {
         val p = py ?: return
-        p.getModule("sys")["path"].callAttr("append", dir.absolutePath)
+        p.getModule("sys")!!["path"]!!.callAttr("append", dir.absolutePath)
         val pyModule = Python.getInstance().getModule(module)
-        val argv = pyModule["sys"]["argv"].asList<PyObject>()
+        val argv = pyModule!!["sys"]!!["argv"]!!.asList()
         argv.clear()
         for (arg in args) argv.add(PyObject.fromJava(arg))
         try {

@@ -51,7 +51,7 @@ class KlipperInstanceView(context: Context) : LinearLayout(context) {
 
         cardView = CardView(context).apply {
             cardElevation = 0f
-            radius = ViewUtils.dp(14)
+            radius = ViewUtils.dp(14).toFloat()
             val fl = FrameLayout(context).apply {
                 setPadding(ViewUtils.dp(8), ViewUtils.dp(8), ViewUtils.dp(8), ViewUtils.dp(8))
                 icon = ImageView(context).apply {
@@ -161,14 +161,14 @@ class KlipperInstanceView(context: Context) : LinearLayout(context) {
         icon.setImageResource(instance.icon.drawable)
         title.text = instance.name
 
-        if (instance.state == KlipperInstance.State.STARTING) {
+        if (instance.getState() == KlipperInstance.State.STARTING) {
             subtitle.setText(R.string.InstanceStarting)
-        } else if (instance.state == KlipperInstance.State.STOPPING) {
+        } else if (instance.getState() == KlipperInstance.State.STOPPING) {
             subtitle.setText(R.string.InstanceStopping)
         }
 
         val wasVisible = subtitle.tag != null
-        val visible = instance.state == KlipperInstance.State.STARTING || instance.state == KlipperInstance.State.STOPPING
+        val visible = instance.getState() == KlipperInstance.State.STARTING || instance.getState() == KlipperInstance.State.STOPPING
         if (visible != wasVisible) {
             subtitle.visibility = if (visible) VISIBLE else GONE
             subtitle.tag = if (visible) true else null
@@ -176,12 +176,12 @@ class KlipperInstanceView(context: Context) : LinearLayout(context) {
 
         setColorIndex(id.hashCode() % 10)
         startStopButton.setColorIndex(id.hashCode() % 10)
-        startStopButton.setStopped(instance.state != KlipperInstance.State.RUNNING && instance.state != KlipperInstance.State.STOPPING)
+        startStopButton.setStopped(instance.getState() != KlipperInstance.State.RUNNING && instance.getState() != KlipperInstance.State.STOPPING)
         startStopButton.setOnClickListener {
-            val inst = KlipperInstance.getInstance(id ?: return)
-            if (inst.state == KlipperInstance.State.STARTING || inst.state == KlipperInstance.State.STOPPING) return@setOnClickListener
+            val inst = KlipperInstance.getInstance(id ?: return@setOnClickListener) ?: return@setOnClickListener
+            if (inst.getState() == KlipperInstance.State.STARTING || inst.getState() == KlipperInstance.State.STOPPING) return@setOnClickListener
 
-            if (inst.state == KlipperInstance.State.IDLE) {
+            if (inst.getState() == KlipperInstance.State.IDLE) {
                 if (!KlipperInstance.hasFreeSlots()) {
                     MaterialAlertDialogBuilder(context)
                         .setTitle(R.string.NoFreeSlots)
@@ -214,11 +214,11 @@ class KlipperInstanceView(context: Context) : LinearLayout(context) {
         if (visible) {
             subtitle.visibility = VISIBLE
             subtitle.alpha = 0f
-            fY = ViewUtils.dp(8)
+            fY = ViewUtils.dp(8).toFloat()
             tY = 0f
         } else {
             fY = 0f
-            tY = ViewUtils.dp(8)
+            tY = ViewUtils.dp(8).toFloat()
         }
         visibleAnimation = SpringAnimation(FloatValueHolder(0f))
             .setMinimumVisibleChange(1 / 256f)

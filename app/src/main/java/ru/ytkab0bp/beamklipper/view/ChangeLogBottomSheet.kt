@@ -41,8 +41,8 @@ class ChangeLogBottomSheet(context: Context) : BottomSheetDialog(context) {
             orientation = LinearLayout.VERTICAL
             val gd = GradientDrawable().apply {
                 cornerRadii = floatArrayOf(
-                    ViewUtils.dp(28), ViewUtils.dp(28),
-                    ViewUtils.dp(28), ViewUtils.dp(28),
+                    ViewUtils.dp(28).toFloat(), ViewUtils.dp(28).toFloat(),
+                    ViewUtils.dp(28).toFloat(), ViewUtils.dp(28).toFloat(),
                     0f, 0f,
                     0f, 0f
                 )

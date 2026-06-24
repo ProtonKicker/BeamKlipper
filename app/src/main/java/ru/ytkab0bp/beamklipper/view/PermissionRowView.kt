@@ -71,27 +71,27 @@ class PermissionRowView(context: Context) : LinearLayout(context) {
 
         dividerPaint.color = ViewUtils.resolveColor(context, R.attr.cardOutlineColor)
         dividerPaint.style = Paint.Style.STROKE
-        dividerPaint.strokeWidth = ViewUtils.dp(1.5f)
+        dividerPaint.strokeWidth = ViewUtils.dp(1.5f).toFloat()
     }
 
     fun bind(text: Int, checked: Boolean, divider: Boolean) {
         titleView.setText(text)
-        setChecked(checked)
+        isChecked = checked
         this.divider = divider
         invalidate()
     }
 
-    fun setChecked(c: Boolean) {
-        mSwitch.isChecked = c
-        isEnabled = !c
-    }
-
-    fun isChecked(): Boolean = mSwitch.isChecked
+    var isChecked: Boolean
+        get() = mSwitch.isChecked
+        set(value) {
+            mSwitch.isChecked = value
+            isEnabled = !value
+        }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (divider) {
-            canvas.drawLine(ViewUtils.dp(1.5f), height - ViewUtils.dp(1), width - ViewUtils.dp(1.5f), height - ViewUtils.dp(1), dividerPaint)
+            canvas.drawLine(ViewUtils.dp(1.5f).toFloat(), (height - ViewUtils.dp(1)).toFloat(), (width - ViewUtils.dp(1.5f)).toFloat(), (height - ViewUtils.dp(1)).toFloat(), dividerPaint)
         }
     }
 }

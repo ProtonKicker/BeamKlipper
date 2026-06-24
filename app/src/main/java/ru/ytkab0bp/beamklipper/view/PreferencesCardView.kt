@@ -3,6 +3,7 @@ package ru.ytkab0bp.beamklipper.view
 import android.Manifest
 import android.app.Activity
 import android.content.Context
+import android.content.DialogInterface
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Canvas
@@ -56,7 +57,7 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
     private var progress = 0f
     val listView: RecyclerView
     private val path = Path()
-    private val adapter: RecyclerView.Adapter<RecyclerView.ViewHolder>
+    private lateinit var adapter: RecyclerView.Adapter<RecyclerView.ViewHolder>
 
     private var itemsCount = 0
     private var accountHeaderRow = 0
@@ -86,7 +87,7 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             strokeCap = Paint.Cap.ROUND
             style = Paint.Style.STROKE
-            strokeWidth = ViewUtils.dp(4f)
+            strokeWidth = ViewUtils.dp(4f).toFloat()
             color = ViewUtils.resolveColor(context, R.attr.dividerColor)
         }
         header = object : LinearLayout(context) {
@@ -195,7 +196,7 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
                                     if (CloudController.getUserInfo() == null) {
                                         pref.bind(context.getString(R.string.SettingsCloudLoading), null)
                                     } else {
-                                        val info = CloudController.getUserInfo() ?: return@setOnClickListener
+                                        val info = CloudController.getUserInfo() ?: return
                                     pref.bind(info.displayName, context.getString(R.string.SettingsCloudTapToManage))
                                     }
                                 }
@@ -231,10 +232,10 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
                                 v.setOnClickListener {
                                     MaterialAlertDialogBuilder(it.context)
                                         .setTitle(R.string.USBDeviceNaming)
-                                        .setItems(arrayOf<CharSequence>(
+                                        .setItems(arrayOf(
                                             KlipperApp.INSTANCE.getString(R.string.USBDeviceNamingByPath),
                                             KlipperApp.INSTANCE.getString(R.string.USBDeviceNamingByVidPid)
-                                        ) { dialog, which ->
+                                        ), DialogInterface.OnClickListener { dialog, which ->
                                             Prefs.usbDeviceNaming = which
                                             adapter.notifyItemChanged(holder.adapterPosition)
                                         })
@@ -251,10 +252,10 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
                                 v.setOnClickListener {
                                     MaterialAlertDialogBuilder(it.context)
                                         .setTitle(R.string.WebFrontend)
-                                        .setItems(arrayOf<CharSequence>(
+                                        .setItems(arrayOf(
                                             KlipperApp.INSTANCE.getString(R.string.Fluidd),
                                             KlipperApp.INSTANCE.getString(R.string.Mainsail)
-                                        ) { dialog, which ->
+                                        ), DialogInterface.OnClickListener { dialog, which ->
                                             Prefs.isMainsailEnabled = which == 1
                                             adapter.notifyItemChanged(holder.adapterPosition)
                                         })

@@ -95,7 +95,9 @@ open class BaseKlippyService(private val num: Int) : BasePythonService() {
                     fos.write(BundleInstaller.readString(KlipperApp.INSTANCE.assets, "klipper/beam_beeper.cfg").toByteArray(StandardCharsets.UTF_8))
                     fos.close()
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                Log.w("klippy_$num", "Failed to read/parse printer.cfg", e)
+            }
             runPython(File(KlipperApp.INSTANCE.filesDir, "klipper/klippy"), "klippy", "klippy.py", "-B", virtualInput.absolutePath, "-l", logs.absolutePath, "-a", socket.absolutePath, printerCfg.absolutePath)
         } catch (e: Exception) {
             Log.e("klippy_$num", "Failed to start klippy", e)

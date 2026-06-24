@@ -18,7 +18,6 @@ import java.io.IOException
 
 class InstanceFilesProvider : DocumentsProvider() {
     override fun onCreate(): Boolean {
-        super.onCreate()
         return true
     }
 
@@ -143,7 +142,7 @@ class InstanceFilesProvider : DocumentsProvider() {
             f?.let { f2 -> inst?.let { i -> id = getDocIdForFile(i, f2) } }
                 ?: return
         } else {
-            f = getFileForDocId(id)
+            f = getFileForDocId(id!!)
         }
 
         val fileVal = f ?: return

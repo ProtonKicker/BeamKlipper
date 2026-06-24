@@ -42,7 +42,7 @@ object ViewUtils {
             tf = Typeface.createFromAsset(KlipperApp.INSTANCE.assets, "$key.ttf")
             typefaceCache[key] = tf
         }
-        return tf
+        return tf!!
     }
 
     @JvmStatic

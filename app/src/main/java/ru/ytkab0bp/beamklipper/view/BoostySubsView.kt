@@ -22,7 +22,7 @@ class BoostySubsView(context: Context) : View(context) {
     private val rect = Rect()
 
     init {
-        paint.textSize = ViewUtils.dp(20)
+        paint.textSize = ViewUtils.dp(20).toFloat()
         paint.typeface = ViewUtils.getTypeface(ViewUtils.ROBOTO_MEDIUM)
         updateColors()
     }

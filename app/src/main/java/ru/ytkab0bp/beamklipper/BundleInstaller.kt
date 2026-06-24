@@ -24,7 +24,7 @@ object BundleInstaller {
                 prefs.edit().putString("version", ver).apply()
             }
 
-            val nativeDir = File(info.applicationInfo.nativeLibraryDir)
+            val nativeDir = File(info.applicationInfo!!.nativeLibraryDir)
             val lib = File(nativeDir, "libklippy_chelper.so")
 
             var str = readString(assets, "klipper/klippy/chelper/__init__.py")

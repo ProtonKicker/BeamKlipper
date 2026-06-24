@@ -103,7 +103,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var logoView: ImageView
     private lateinit var titleView: TextView
     private lateinit var badgesLayout: FrameLayout
-    private var refBadges: Array<RefBadgeView> = emptyArray()
+    private var refBadges: Array<RefBadgeView?> = emptyArray()
 
     private var isTV = false
     private var isCurrentLauncher = false
@@ -199,7 +199,7 @@ class MainActivity : AppCompatActivity() {
         val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = ViewUtils.resolveColor(this@MainActivity, R.attr.dividerColor)
             style = Paint.Style.STROKE
-            strokeWidth = ViewUtils.dp(1f)
+            strokeWidth = ViewUtils.dp(1f).toFloat()
         }
 
         listView = RecyclerView(this).apply {
@@ -213,8 +213,8 @@ class MainActivity : AppCompatActivity() {
                         val itemCountVal = adapter?.itemCount ?: continue
                         if (parent.getChildViewHolder(child).adapterPosition != itemCountVal - 1) {
                             c.drawLine(
-                                ViewUtils.dp(1.5f), child.y + child.height - ViewUtils.dp(1),
-                                child.width - ViewUtils.dp(1.5f), child.y + child.height - ViewUtils.dp(1),
+                                ViewUtils.dp(1.5f).toFloat(), child.y + child.height - ViewUtils.dp(1),
+                                (child.width - ViewUtils.dp(1.5f)).toFloat(), child.y + child.height - ViewUtils.dp(1),
                                 dividerPaint
                             )
                         }
@@ -356,8 +356,8 @@ class MainActivity : AppCompatActivity() {
                     val child = getChildAt(i)
                     if (child.visibility == View.VISIBLE) {
                         canvas.drawLine(
-                            ViewUtils.dp(1.5f), child.y + child.height - ViewUtils.dp(1),
-                            child.width - ViewUtils.dp(1.5f), child.y + child.height - ViewUtils.dp(1),
+                            ViewUtils.dp(1.5f).toFloat(), child.y + child.height - ViewUtils.dp(1),
+                            (child.width - ViewUtils.dp(1.5f)).toFloat(), child.y + child.height - ViewUtils.dp(1),
                             dividerPaint
                         )
                     }
@@ -476,7 +476,7 @@ class MainActivity : AppCompatActivity() {
                     if (editInstance!!.remoteId != null) {
                         pendingRemotePrinter = null
                         isChecked = false
-                        CloudAPI.INSTANCE.remoteDeletePrinter(editInstance!!.remoteId) {}
+                        CloudAPI.INSTANCE.remoteDeletePrinter(editInstance!!.remoteId!!) {}
                         editInstance!!.remoteId = null
                         editInstance!!.remoteToken = null
                         remoteCopyRow.visibility = View.GONE
@@ -486,7 +486,7 @@ class MainActivity : AppCompatActivity() {
                     isRequestingRemoteToken = true
                     CloudAPI.INSTANCE.remoteGetPrinters(object : APICallback<List<CloudAPI.RemotePrinter>> {
                         override fun onResponse(response: List<CloudAPI.RemotePrinter>) {
-                            val respFeatures = CloudController.getUserFeatures() ?: return@setOnClickListener
+                            val respFeatures = CloudController.getUserFeatures() ?: return
                             if (response.size >= respFeatures.remoteAccessPrintersLimit) {
                                 isRequestingRemoteToken = false
                                 ViewUtils.postOnMainThread {
@@ -511,9 +511,10 @@ class MainActivity : AppCompatActivity() {
                                         .show()
                                 }
                             } else {
-                                val curInstance = editInstance ?: run {
+                                val curInstance = editInstance
+                                if (curInstance == null) {
                                     isRequestingRemoteToken = false
-                                    return@setOnClickListener
+                                    return
                                 }
                                 CloudAPI.INSTANCE.remoteCreatePrinter(curInstance.name, object : APICallback<CloudAPI.RemotePrinter> {
                                     override fun onResponse(response: CloudAPI.RemotePrinter) {
@@ -556,7 +557,7 @@ class MainActivity : AppCompatActivity() {
                 CloudAPI.INSTANCE.remoteGetPrinters(object : APICallback<List<CloudAPI.RemotePrinter>> {
                     override fun onResponse(response: List<CloudAPI.RemotePrinter>) {
                         isRequestingRemoteToken = false
-                        val instance = editInstance ?: return@setOnClickListener
+                        val instance = editInstance ?: return
                         for (printer in response) {
                             if (printer.id == instance.remoteId) {
                                 ViewUtils.postOnMainThread { QRCodeAlertDialog(this@MainActivity, printer.publicUrl).show() }
@@ -629,7 +630,8 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                     }
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    Log.w("MainActivity", "Failed to copy config file", e)
                 }
                 KlipperApp.DATABASE.insert(inst)
                 animateNewOrEditLayout(false)
@@ -659,7 +661,7 @@ class MainActivity : AppCompatActivity() {
         noPermsLayout = MaterialCardView(this@MainActivity).apply {
             setCardBackgroundColor(ViewUtils.resolveColor(this@MainActivity, R.attr.cardOutlineColor))
             setStrokeColor(0)
-            radius = ViewUtils.dp(32)
+            radius = ViewUtils.dp(32).toFloat()
         }
         val ll = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL }
 
@@ -668,7 +670,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(paddingLeft, ViewUtils.dp(6), paddingRight, paddingBottom)
             setOnClickListener {
                 val r = it as PermissionRowView
-                if (!r.isChecked()) {
+                if (!r.isChecked) {
                     startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null)))
                 }
             }
@@ -680,7 +682,7 @@ class MainActivity : AppCompatActivity() {
                 bind(R.string.Notifications, PermissionsChecker.hasNotificationPerm(), true)
                 setOnClickListener {
                     val r = it as PermissionRowView
-                    if (!r.isChecked()) {
+                    if (!r.isChecked) {
                         requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQUEST_NOTIFICATIONS)
                     }
                 }
@@ -695,7 +697,7 @@ class MainActivity : AppCompatActivity() {
                 bind(R.string.HideNotificationsChannel, PermissionsChecker.isNotificationsChannelHidden(), true)
                 setOnClickListener {
                     val r = it as PermissionRowView
-                    if (!r.isChecked()) {
+                    if (!r.isChecked) {
                         Toast.makeText(this@MainActivity, getString(R.string.HideNotificationsChannelInfo, getString(R.string.ServicesChannel)), Toast.LENGTH_SHORT).show()
                         startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -856,7 +858,7 @@ class MainActivity : AppCompatActivity() {
         for (refBadge in refBadges) {
             badgesLayout.removeView(refBadge)
         }
-        refBadges = arrayOfNulls<RefBadgeView>(if (BeamServerData.isBoostyAvailable()) 3 else 2).filterNotNull().toTypedArray()
+        refBadges = arrayOfNulls<RefBadgeView>(if (BeamServerData.isBoostyAvailable()) 3 else 2)
         var i = 0
 
         if (BeamServerData.isBoostyAvailable()) {
@@ -872,7 +874,7 @@ class MainActivity : AppCompatActivity() {
 
         refBadges[i] = RefBadgeView(this@MainActivity).apply {
             setIcon(R.drawable.ic_telegram, R.attr.telegramColor, R.string.BadgeTelegram)
-            icon.translationX = -ViewUtils.dp(1)
+            icon.translationX = -ViewUtils.dp(1).toFloat()
             setOnClickListener { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/ytkab0bp_channel"))) }
             id = R.id.badge_telegram
             nextFocusUpId = R.id.badge_boosty
@@ -910,7 +912,8 @@ class MainActivity : AppCompatActivity() {
         for (j in instances.indices) {
             if (instances[j].id == e.id) {
                 idx = j
-                instances[idx] = KlipperInstance.getInstance(instances[idx].id) ?: continue
+                val instanceId = instances[idx].id ?: continue
+                instances[idx] = KlipperInstance.getInstance(instanceId) ?: continue
                 break
             }
         }
@@ -969,7 +972,7 @@ class MainActivity : AppCompatActivity() {
                     if (editInstance != null) {
                         editInstance = null
                         if (pendingRemotePrinter != null) {
-                            CloudAPI.INSTANCE.remoteDeletePrinter(pendingRemotePrinter?.id ?: return) {}
+                            CloudAPI.INSTANCE.remoteDeletePrinter(pendingRemotePrinter?.id ?: return@addEndListener) {}
                             pendingRemotePrinter = null
                         }
                     }
@@ -1050,7 +1053,7 @@ class MainActivity : AppCompatActivity() {
             val j = refBadges.size - 1 - i
             val pr = (maxOf(posProgress, beb * j) - beb * j) / (1f - beb * j)
 
-            val badge = refBadges[i]
+            val badge = refBadges[i] ?: continue
             badge.setProgress(pr)
 
             val fX = -ViewUtils.dp(9) + badgesLayout.width -
@@ -1061,13 +1064,13 @@ class MainActivity : AppCompatActivity() {
             val fY = 0f
             val tY = ViewUtils.dp(92) + ViewUtils.dp(22 + 18 + 10) * i
 
-            badge.translationX = ViewUtils.lerp(fX, tX, pr)
-            badge.translationY = ViewUtils.lerp(fY, tY, pr)
+            badge.translationX = ViewUtils.lerp(fX.toFloat(), tX, pr)
+            badge.translationY = ViewUtils.lerp(fY, tY.toFloat(), pr)
         }
         titleView.translationX = posProgress * ((badgesLayout.width - titleView.width) / 2f - ViewUtils.dp(28 + 12))
         titleView.translationY = posProgress * ViewUtils.dp(92 - 52)
 
-        val scale = ViewUtils.lerp(ViewUtils.dp(28), ViewUtils.dp(52), posProgress) / ViewUtils.dp(28)
+        val scale = ViewUtils.lerp(ViewUtils.dp(28).toFloat(), ViewUtils.dp(52).toFloat(), posProgress) / ViewUtils.dp(28)
         logoView.scaleX = scale
         logoView.scaleY = scale
         logoView.translationX = posProgress * (badgesLayout.width - logoView.width) / 2f

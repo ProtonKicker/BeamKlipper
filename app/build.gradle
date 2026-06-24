@@ -32,7 +32,7 @@ android {
         python {
             version = "3.10"
             pip {
-                options("--extra-index-url", "https://beam3d.ru/pypi")
+                options("--extra-index-url", "https://beam3d.ru/pypi", "--find-links", "file://" + project.projectDir.toString() + "/python_wheels")
 
                 install "cffi==1.15.1"
                 install "pyserial==3.5"
@@ -128,8 +128,7 @@ dependencies {
     implementation 'androidx.dynamicanimation:dynamicanimation:1.0.0'
     implementation 'org.tukaani:xz:1.9'
     implementation 'org.kamranzafar:jtar:2.3'
-    //noinspection GradleDependency
-    implementation 'com.squareup.okhttp3:okhttp:3.12.6'
+    implementation 'com.squareup.okhttp3:okhttp:3.14.9'
     implementation 'com.google.code.gson:gson:2.13.1'
     implementation 'com.loopj.android:android-async-http:1.4.11'
     implementation 'com.github.androidmads:QRGenerator:1.0.5'
@@ -140,13 +139,13 @@ dependencies {
     implementation project(":eventbus_api")
     kapt project(":eventbus_processor")
 
-    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.8.0'
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.9.24'
 
     constraints {
-        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.0") {
+        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.24") {
             because("kotlin-stdlib-jdk7 is now a part of kotlin-stdlib")
         }
-        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.0") {
+        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.24") {
             because("kotlin-stdlib-jdk8 is now a part of kotlin-stdlib")
         }
     }

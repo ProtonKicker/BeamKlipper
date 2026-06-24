@@ -18,5 +18,4 @@ object KlipperProbeTable {
         }
         return mInstance!!
     }
-    }
 }

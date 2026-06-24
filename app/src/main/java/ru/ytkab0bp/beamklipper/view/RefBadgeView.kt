@@ -102,7 +102,7 @@ class RefBadgeView(context: Context) : LinearLayout(context) {
         icon.setColorFilter(null)
         outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = ViewUtils.dp(1.5f)
+            strokeWidth = ViewUtils.dp(1.5f).toFloat()
             color = ViewUtils.resolveColor(context, R.attr.dividerColor)
         }
         title.setTextColor(ViewUtils.resolveColor(context, android.R.attr.textColorPrimary))
@@ -112,10 +112,10 @@ class RefBadgeView(context: Context) : LinearLayout(context) {
         icon.setImageResource(i)
         if (bgColor != 0) {
             paint.color = ViewUtils.resolveColor(context, bgColor)
-            background = ViewUtils.createRipple(0x21000000, 0)
+            background = ViewUtils.createRipple(0x21000000, 0f)
         } else {
             setColored()
-            background = ViewUtils.createRipple(ViewUtils.resolveColor(context, android.R.attr.colorControlHighlight), 0)
+            background = ViewUtils.createRipple(ViewUtils.resolveColor(context, android.R.attr.colorControlHighlight), 0f)
         }
         title.setText(titleRes)
     }

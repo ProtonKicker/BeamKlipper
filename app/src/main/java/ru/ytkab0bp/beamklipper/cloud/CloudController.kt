@@ -11,6 +11,7 @@ import ru.ytkab0bp.beamklipper.events.CloudUserInfoUpdatedEvent
 import ru.ytkab0bp.beamklipper.utils.Prefs
 import ru.ytkab0bp.beamklipper.utils.ViewUtils
 import ru.ytkab0bp.sapil.APICallback
+import ru.ytkab0bp.sapil.APIRequestHandle
 
 object CloudController {
     private const val TAG = "cloud"
@@ -29,26 +30,30 @@ object CloudController {
         KlipperApp.EVENT_BUS.fireEvent(CloudLoginStateUpdatedEvent())
     }
 
-    private val loginCheck = Runnable {
-        CloudAPI.INSTANCE.loginCheck(loginSessionId, object : APICallback<CloudAPI.LoginState> {
-            override fun onResponse(response: CloudAPI.LoginState) {
-                if (response.loggedIn) {
-                    Prefs.cloudApiToken = response.bearer
-                    loadUserInfo()
-                    ViewUtils.removeCallbacks(loginAutoCancel)
-                } else if (isLoggingIn) {
-                    ViewUtils.postOnMainThread(loginCheck, 5000)
-                }
-            }
+    private val loginCheck: Runnable
+        get() {
+            val r = Runnable {
+                CloudAPI.INSTANCE.loginCheck(loginSessionId!!, object : APICallback<CloudAPI.LoginState> {
+                    override fun onResponse(response: CloudAPI.LoginState) {
+                        if (response.loggedIn) {
+                            Prefs.cloudApiToken = response.bearer
+                            loadUserInfo()
+                            ViewUtils.removeCallbacks(loginAutoCancel)
+                        } else if (isLoggingIn) {
+                            ViewUtils.postOnMainThread(this@CloudController.loginCheck, 5000)
+                        }
+                    }
 
-            override fun onException(e: Exception) {
-                Log.e(TAG, "Failed to check login state", e)
-                if (isLoggingIn) {
-                    ViewUtils.postOnMainThread(loginCheck, 5000)
-                }
+                    override fun onException(e: Exception) {
+                        Log.e(TAG, "Failed to check login state", e)
+                        if (isLoggingIn) {
+                            ViewUtils.postOnMainThread(this@CloudController.loginCheck, 5000)
+                        }
+                    }
+                })
             }
-        })
-    }
+            return r
+        }
 
     private val gson = Gson()
 

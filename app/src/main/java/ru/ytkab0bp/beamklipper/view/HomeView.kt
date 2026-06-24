@@ -37,7 +37,7 @@ class HomeView(context: Context) : FrameLayout(context) {
                     if (progress == 0f && scrollView != null && scrollView!!.canScrollVertically(if ((e1?.y ?: e2.y) - e2.y > 0) 1 else -1)) {
                         isTouchDisabled = true
                     } else if (animation == null && Math.abs(e2.y - (e1?.y ?: e2.y)) >= touchSlop && Math.abs(distanceY) >= Math.abs(distanceX) * 1.5f) {
-                        startOffset = e2.y - e1.y
+                        startOffset = e2.y - (e1?.y ?: e2.y)
                         startProgress = progress
                         processingSwipe = true
 
