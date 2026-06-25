@@ -6,6 +6,9 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import androidx.multidex.MultiDexApplication
 import org.json.JSONObject
 import ru.ytkab0bp.beamklipper.cloud.AndroidPlatform
 import ru.ytkab0bp.beamklipper.cloud.CloudController
@@ -16,7 +19,7 @@ import ru.ytkab0bp.beamklipper.utils.ViewUtils
 import ru.ytkab0bp.eventbus.EventBus
 import ru.ytkab0bp.remotebeamlib.RemoteBeam
 
-class KlipperApp : Application() {
+class KlipperApp : MultiDexApplication() {
     override fun onCreate() {
         super.onCreate()
         INSTANCE = this
@@ -27,7 +30,13 @@ class KlipperApp : Application() {
         BundleInstaller.init(this)
         RemoteBeam.init(AndroidPlatform)
         CloudController.initCached()
-        CloudController.init()
+        Handler(Looper.getMainLooper()).post {
+            try {
+                CloudController.init()
+            } catch (e: NoClassDefFoundError) {
+                android.util.Log.w("KlipperApp", "Cloud API not available (secondary DEX not loaded)", e)
+            }
+        }
 
         hasUpdateInfo = try {
             assets.open("update.json").close()

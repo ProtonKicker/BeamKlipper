@@ -20,3 +20,6 @@ local.properties
 /app/release/
 /app/src/main/assets/moonraker/timelapse.cfg
 /app/src/main/assets/update.json
+
+# Keystore
+beamklipper.keystore

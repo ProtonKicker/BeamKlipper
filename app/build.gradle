@@ -16,7 +16,19 @@ apply plugin: 'kotlin-kapt'
 
 def commit = getGitCommitHash(file('.'))
 
+def keystorePropertiesFile = rootProject.file('local.properties')
+def keystoreProperties = new Properties()
+keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+
 android {
+    signingConfigs {
+        release {
+            storeFile file(keystoreProperties['key.store'])
+            storePassword keystoreProperties['key.store.password']
+            keyAlias keystoreProperties['key.alias']
+            keyPassword keystoreProperties['key.key.password']
+        }
+    }
     namespace 'ru.ytkab0bp.beamklipper'
     compileSdk 35
 
@@ -24,8 +36,11 @@ android {
         applicationId "ru.ytkab0bp.beamklipper"
         minSdk 21
         targetSdk 35
+        multiDexEnabled true
+        multiDexKeepFile file('multidex-keep.txt')
+        multiDexKeepProguard file('multidex-keep.pro')
         versionCode 10
-        versionName "2.0.0_klipper-0.12.0"
+        versionName "v0-alpha-kotlin_klipper-0.12.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -69,6 +84,7 @@ android {
 
     buildTypes {
         release {
+            signingConfig signingConfigs.release
             buildConfigField "boolean", "IS_GOOGLE_PLAY", "false"
             buildConfigField "String", "COMMIT", "\"" + commit + "\""
             minifyEnabled false
@@ -84,6 +100,7 @@ android {
             }
         }
     }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
@@ -130,6 +147,7 @@ dependencies {
     implementation 'org.kamranzafar:jtar:2.3'
     implementation 'com.squareup.okhttp3:okhttp:3.14.9'
     implementation 'com.google.code.gson:gson:2.13.1'
+    implementation 'androidx.multidex:multidex:2.0.1'
     implementation 'com.loopj.android:android-async-http:1.4.11'
     implementation 'com.github.androidmads:QRGenerator:1.0.5'
 
