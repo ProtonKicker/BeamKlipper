@@ -6,6 +6,8 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
+import java.io.File
+import java.io.IOException
 import android.os.Handler
 import android.os.Looper
 import androidx.multidex.MultiDexApplication
@@ -20,6 +22,61 @@ import ru.ytkab0bp.eventbus.EventBus
 import ru.ytkab0bp.remotebeamlib.RemoteBeam
 
 class KlipperApp : MultiDexApplication() {
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base)
+        try {
+            val apkFile = File(applicationInfo.sourceDir)
+            val loader = javaClass.classLoader ?: return
+            val secondaryBytes = readSecondaryDexBytes(apkFile) ?: return
+
+            val inmemLoader = dalvik.system.InMemoryDexClassLoader(
+                java.nio.ByteBuffer.allocateDirect(secondaryBytes.size).put(secondaryBytes).also { it.flip() },
+                loader
+            )
+
+            var pathListClass: Class<*> = loader::class.java
+            while (pathListClass != null && pathListClass.declaredFields.none { it.name == "pathList" }) {
+                pathListClass = pathListClass.superclass
+            }
+            val pathListField = pathListClass!!.getDeclaredField("pathList")
+            pathListField.isAccessible = true
+            val pathList = pathListField.get(loader)
+
+            var localPathListClass: Class<*> = inmemLoader::class.java
+            while (localPathListClass != null && localPathListClass.declaredFields.none { it.name == "pathList" }) {
+                localPathListClass = localPathListClass.superclass
+            }
+            val localPathListField = localPathListClass!!.getDeclaredField("pathList")
+            localPathListField.isAccessible = true
+            val localPathList = localPathListField.get(inmemLoader)
+            val localElementsField = localPathList.javaClass.getDeclaredField("dexElements")
+            localElementsField.isAccessible = true
+            val localElements = localElementsField.get(localPathList) as Array<*>
+
+            val existingElementsField = pathList.javaClass.getDeclaredField("dexElements")
+            existingElementsField.isAccessible = true
+            val existingElements = existingElementsField.get(pathList) as Array<*>
+
+            val elementType = existingElements.javaClass.componentType
+            val combined = java.lang.reflect.Array.newInstance(elementType, existingElements.size + localElements.size)
+            System.arraycopy(existingElements, 0, combined, 0, existingElements.size)
+            System.arraycopy(localElements, 0, combined, existingElements.size, localElements.size)
+            existingElementsField.set(pathList, combined)
+        } catch (e: Exception) {
+            android.util.Log.w("KlipperApp", "Failed secondary DEX install", e)
+        }
+    }
+
+    private fun readSecondaryDexBytes(apk: File): ByteArray? {
+        val zipFile = java.util.zip.ZipFile(apk)
+        try {
+            val entry = zipFile.getEntry("classes2.dex") ?: return null
+            return zipFile.getInputStream(entry).use { it.readBytes() }
+        } finally {
+            zipFile.close()
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         INSTANCE = this
