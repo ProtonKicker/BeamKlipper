@@ -29,7 +29,7 @@ android {
         python {
             version = "3.10"
             pip {
-                options("--extra-index-url", "https://beam3d.ru/pypi")
+                options("-f", "/tmp/wheels_dir")
 
                 install "cffi==1.15.1"
                 install "pyserial==3.5"
@@ -65,11 +65,27 @@ android {
         }
     }
 
+    signingConfigs {
+        debug {
+            storeFile file(System.getProperty("user.home") + "/.android/debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
+        release {
+            storeFile file(System.getProperty("user.home") + "/.android/debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
+    }
+
     buildTypes {
         release {
             buildConfigField "boolean", "IS_GOOGLE_PLAY", "false"
             buildConfigField "String", "COMMIT", "\"" + commit + "\""
             minifyEnabled false
+            signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
@@ -276,6 +292,7 @@ tasks.register('bundleKlipper') {
             JSONArray arr = new JSONArray()
             files.each {
                 var sub = it.getAbsolutePath().substring(klippy.getAbsolutePath().length() + 1).replace('\\', '/')
+                if (sub.startsWith(".") || sub.contains("/.")) return
                 arr.put('klippy/' + sub)
                 var f = new File(assets, 'klipper/klippy/' + sub)
                 f.getParentFile().mkdirs()
@@ -289,6 +306,7 @@ tasks.register('bundleKlipper') {
                 if (it.getName() == ".pylintrc") return
 
                 var sub = it.getAbsolutePath().substring(klippy.getAbsolutePath().length() + 1).replace('\\', '/')
+                if (sub.startsWith(".") || sub.contains("/.")) return
                 arr.put('klippy/extras/' + sub)
                 var f = new File(assets, 'klipper/klippy/extras/' + sub)
                 f.getParentFile().mkdirs()
@@ -302,6 +320,7 @@ tasks.register('bundleKlipper') {
                 if (!it.getName().endsWith(".py") && !it.getName().endsWith(".cfg")) return
 
                 var sub = it.getAbsolutePath().substring(klippy.getAbsolutePath().length() + 1).replace('\\', '/')
+                if (sub.startsWith(".") || sub.contains("/.")) return
                 arr.put('klippy/extras/' + sub)
                 var f = new File(assets, 'klipper/klippy/extras/' + sub)
                 f.getParentFile().mkdirs()
@@ -315,6 +334,7 @@ tasks.register('bundleKlipper') {
                 if (it.getName() == "ext_version") return
 
                 var sub = it.getAbsolutePath().substring(klippy.getAbsolutePath().length() + 1).replace('\\', '/')
+                if (sub.startsWith(".") || sub.contains("/.")) return
                 arr.put('klippy/extras/' + sub)
                 var f = new File(assets, 'klipper/klippy/extras/' + sub)
                 f.getParentFile().mkdirs()
@@ -326,6 +346,7 @@ tasks.register('bundleKlipper') {
             collectFiles(klippy, files)
             files.each {
                 var sub = it.getAbsolutePath().substring(klippy.getAbsolutePath().length() + 1).replace('\\', '/')
+                if (sub.startsWith(".") || sub.contains("/.")) return
                 arr.put('config/' + sub)
                 var f = new File(assets, 'klipper/config/' + sub)
                 f.getParentFile().mkdirs()
@@ -337,9 +358,8 @@ tasks.register('bundleKlipper') {
             collectFiles(klippy, files)
             files.each {
                 var sub = it.getAbsolutePath().substring(klippy.getAbsolutePath().length() + 1).replace('\\', '/')
-                if (sub.startsWith("_klipper3d") || sub.startsWith("_kalico") || sub.startsWith("_kalico/")) {
-                    return
-                }
+                if (sub.startsWith(".") || sub.contains("/.")) return
+                if (sub.startsWith("_klipper3d") || sub.startsWith("_kalico")) return
                 arr.put('docs/' + sub)
                 var f = new File(assets, 'klipper/docs/' + sub)
                 f.getParentFile().mkdirs()
@@ -356,6 +376,7 @@ tasks.register('bundleKlipper') {
             collectFiles(moonraker, files)
             files.each {
                 var sub = it.getAbsolutePath().substring(moonraker.getAbsolutePath().length() + 1).replace('\\', '/')
+                if (sub.startsWith(".") || sub.contains("/.")) return
                 arr.put('moonraker/' + sub)
                 var f = new File(assets, 'moonraker/moonraker/' + sub)
                 f.getParentFile().mkdirs()
@@ -367,6 +388,7 @@ tasks.register('bundleKlipper') {
             collectFiles(moonraker, files)
             files.each {
                 var sub = it.getAbsolutePath().substring(moonraker.getAbsolutePath().length() + 1).replace('\\', '/')
+                if (sub.startsWith(".") || sub.contains("/.")) return
                 arr.put('moonraker/components/' + sub)
                 var f = new File(assets, 'moonraker/moonraker/components/' + sub)
                 f.getParentFile().mkdirs()
