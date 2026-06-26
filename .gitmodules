@@ -1,6 +1,6 @@
 [submodule "app/src/main/klipper"]
 	path = app/src/main/klipper
-	url = https://github.com/utkabobr/klipper
+	url = https://github.com/KalicoCrew/kalico.git
 [submodule "app/src/main/moonraker"]
 	path = app/src/main/moonraker
 	url = https://github.com/utkabobr/moonraker

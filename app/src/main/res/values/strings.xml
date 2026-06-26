@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="AppName" translatable="false">Beam Klipper</string>
+    <string name="AppName" translatable="false">Beam Kalico</string>
     <string name="InstanceN">%s</string>
     <string name="ServicesChannel">Services</string>
     <string name="KlippyTitle">Klippy (%s)</string>
@@ -78,7 +78,7 @@
     <string name="SettingsCloudManageFeatureAIGeneratorDescription">%1$d models from photo per month in Slice Beam</string>
     <string name="SettingsCloudManageFeatureRemoteAccess">Remote access</string>
     <string name="SettingsCloudManageFeatureRemoteAccessDescription">Connect up to %1$d printers into Beam Cloud for easy access from anywhere</string>
-    <string name="SettingsCloudManageFeatureFreeForAll">Beam Klipper can remain free for all</string>
+    <string name="SettingsCloudManageFeatureFreeForAll">Beam Kalico can remain free for all</string>
     <string name="SettingsCloudManageFeatureFreeForAllDescription">Your nickname will be written in the list of supporters.\nThanks for your support!</string>
     <string name="SettingsCloudManageLevelRedirectMessage">By subscribing to this level you accept terms of service.</string>
     <string name="SettingsCloudManageLevelRedirectAlreadySubscribed">Already subscribed?</string>

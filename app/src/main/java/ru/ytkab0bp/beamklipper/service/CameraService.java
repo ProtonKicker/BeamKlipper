@@ -140,7 +140,7 @@ public class CameraService extends Service {
         super.onCreate();
 
         PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
-        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "BeamKlipper::CameraWakeLock");
+        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "BeamKalico::CameraWakeLock");
         wakeLock.acquire();
 
         cameraThread = new HandlerThread("camera");

@@ -29,7 +29,7 @@ public class BeamServerData {
     public static BeamServerData SERVER_DATA;
 
     static {
-        client.setUserAgent(String.format(Locale.ROOT, "BeamKlipper/%s-%d", BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE));
+        client.setUserAgent(String.format(Locale.ROOT, "BeamKalico/%s-%d", BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE));
         client.setEnableRedirects(true);
         client.setLoggingEnabled(false);
     }

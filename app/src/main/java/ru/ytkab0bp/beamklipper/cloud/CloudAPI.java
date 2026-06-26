@@ -27,7 +27,7 @@ public interface CloudAPI extends APIRunner {
 
         @Override
         public String getDefaultUserAgent() {
-            return "BeamKlipper v" + BuildConfig.VERSION_NAME + "/" + BuildConfig.VERSION_CODE;
+            return "BeamKalico v" + BuildConfig.VERSION_NAME + "/" + BuildConfig.VERSION_CODE;
         }
 
         @Override

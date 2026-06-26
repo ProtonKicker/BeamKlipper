@@ -1,6 +1,6 @@
-# Beam Klipper - Klipper for vanilla Android!
+# Beam Kalico - Kalico for vanilla Android!
 
-Beam Klipper allows you to run [Klipper](https://github.com/KevinOConnor/klipper) host software (Klippy) on any Android 5.0+ device with OTG support.
+Beam Kalico allows you to run [Kalico](https://github.com/KalicoCrew/kalico) host software (Klippy) on any Android 5.0+ device with OTG support.
 
 Telegram: https://t.me/ytkab0bp_channel
 
@@ -10,7 +10,7 @@ K3D Chat for discussion & support (Russian language only): https://t.me/K_3_D
 
 # Quick start
 
-1. Download & install firmware.bin from [here](https://github.com/utkabobr/klipper/tree/prebuilt-v0.12.0) (or build your own from [this repo](https://github.com/utkabobr/klipper) to ensure versions compatibility)
+1. Build MCU firmware from the [Kalico source](https://github.com/KalicoCrew/kalico) (see `make menuconfig` in Kalico docs)
 2. Install APK from [Releases tab](https://github.com/utkabobr/BeamKlipper/releases/latest)
 3. Allow all the permissions required
 4. Add printer instance (Click generic-***.cfg if your printer is not available)
@@ -19,11 +19,11 @@ K3D Chat for discussion & support (Russian language only): https://t.me/K_3_D
 7. Configure serial port from "Devices" tab in web editor (1.0.1+ configures automatically if you use single printer setup)
 8. You're awesome!
 
-# Can I use device as regular after I install Beam Klipper to it?
+# Can I use device as regular after I install Beam Kalico to it?
 
 **Yes!** You definitely can!
 
-Beam Klipper does not do **anything** to your Android system, it runs in user-space as a regular Android app
+Beam Kalico does not do **anything** to your Android system, it runs in user-space as a regular Android app
 
 # What's IP:port?
 
@@ -39,18 +39,18 @@ Recommended camera config is mjpeg-**stream** (Not adaptive mjpeg) for Fluidd an
 
 # What's inside?
 
-Beam Klipper bundles:
-- [Klipper](https://github.com/KevinOConnor/klipper)
+Beam Kalico bundles:
+- [Kalico](https://github.com/KalicoCrew/kalico)
 - [Moonraker](https://github.com/Arksine/moonraker)
 - [Fluidd](https://github.com/fluidd-core/fluidd)
 - [Mainsail](https://github.com/mainsail-crew/mainsail)
 - [Happy Hare](https://github.com/moggieuk/Happy-Hare)
-- [Klipper TMC Autotune](https://github.com/andrewmcgr/klipper_tmc_autotune)
+- [TMC Autotune](https://github.com/andrewmcgr/klipper_tmc_autotune)
 - [Moonraker-timelapse](https://github.com/mainsail-crew/moonraker-timelapse)
 
 # Beam extensions
 
-Beam Klipper provides additional extensions to control some built-in features.
+Beam Kalico provides additional extensions to control some built-in features.
 
 ### Camera
 
@@ -79,7 +79,7 @@ You can circumvent this by setting app as default launcher and allowing all the 
 
 # Android TV support?
 
-Yup. Should be working just fine. But please note that some cheap TV boxes does not support setting Beam Klipper as launcher without disabling system one first, use ADB or root to disable it.
+Yup. Should be working just fine. But please note that some cheap TV boxes does not support setting Beam Kalico as launcher without disabling system one first, use ADB or root to disable it.
 
 # What USB hub to use?
 
