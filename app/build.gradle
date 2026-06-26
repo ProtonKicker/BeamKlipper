@@ -21,7 +21,7 @@ android {
         applicationId "ru.ytkab0bp.beamklipper"
         minSdk 21
         targetSdk 35
-        versionCode 10
+        versionCode 11
         versionName "2.0.0_kalico"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -337,7 +337,7 @@ tasks.register('bundleKlipper') {
             collectFiles(klippy, files)
             files.each {
                 var sub = it.getAbsolutePath().substring(klippy.getAbsolutePath().length() + 1).replace('\\', '/')
-                if (sub.startsWith("_klipper3d")) {
+                if (sub.startsWith("_klipper3d") || sub.startsWith("_kalico") || sub.startsWith("_kalico/")) {
                     return
                 }
                 arr.put('docs/' + sub)
