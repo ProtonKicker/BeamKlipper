@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="AppName" translatable="false">Beam Kalico</string>
+    <string name="AppName" translatable="false">BeamKlipper - Kalico</string>
     <string name="InstanceN">%s</string>
     <string name="ServicesChannel">Services</string>
     <string name="KlippyTitle">Klippy (%s)</string>

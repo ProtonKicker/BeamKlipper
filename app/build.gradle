@@ -29,7 +29,7 @@ android {
         python {
             version = "3.10"
             pip {
-                options("-f", "/tmp/wheels_dir")
+                options("-f", file(rootDir.absolutePath + "/wheels").absolutePath)
 
                 install "cffi==1.15.1"
                 install "pyserial==3.5"
