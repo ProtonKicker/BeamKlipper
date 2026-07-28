@@ -55,7 +55,7 @@ class InstanceFilesProvider : DocumentsProvider() {
     }
 
     override fun openDocument(documentId: String, mode: String, signal: CancellationSignal?): ParcelFileDescriptor {
-        val file = getFileForDocId(documentId)
+        val file = getFileForDocId(documentId) ?: throw FileNotFoundException("No file for $documentId")
         val accessMode = ParcelFileDescriptor.parseMode(mode)
         val isWrite = mode.indexOf('w') != -1
         return if (isWrite) {
@@ -72,7 +72,7 @@ class InstanceFilesProvider : DocumentsProvider() {
     }
 
     override fun openDocumentThumbnail(documentId: String, sizeHint: Point?, signal: CancellationSignal?): AssetFileDescriptor {
-        val file = getFileForDocId(documentId)
+        val file = getFileForDocId(documentId) ?: throw FileNotFoundException("No file for $documentId")
         val pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
         return AssetFileDescriptor(pfd, 0, AssetFileDescriptor.UNKNOWN_LENGTH)
     }
@@ -80,7 +80,10 @@ class InstanceFilesProvider : DocumentsProvider() {
     override fun createDocument(documentId: String, mimeType: String, displayName: String): String {
         val parent = getFileForDocId(documentId) ?: throw FileNotFoundException("No parent for $documentId")
         val inst = getInstanceForDocId(documentId)
-        val file = File(parent.path, displayName)
+        if (displayName.contains('/') || displayName.contains('\\') || displayName == "." || displayName == "..") {
+            throw FileNotFoundException("Invalid document name: $displayName")
+        }
+        val file = resolveChildFile(parent, displayName) ?: throw FileNotFoundException("Invalid path for $displayName")
         try {
             file.createNewFile()
             file.setWritable(true)
@@ -130,7 +133,8 @@ class InstanceFilesProvider : DocumentsProvider() {
             val i = str.indexOf(':')
             if (i == -1) return null
             val inst = KlipperInstance.getInstance(str.substring(0, i)) ?: return null
-            return File(inst.publicDirectory, str.substring(i + 1))
+            val relativePath = str.substring(i + 1)
+            return resolveChildFile(inst.publicDirectory, relativePath)
         }
         return null
     }
@@ -215,6 +219,22 @@ class InstanceFilesProvider : DocumentsProvider() {
                 DocumentsContract.Document.MIME_TYPE_DIR
             } else {
                 getTypeForName(file.name)
+            }
+        }
+
+        private fun resolveChildFile(parent: File, child: String): File? {
+            return try {
+                val root = parent.canonicalFile
+                val target = File(root, child).canonicalFile
+                val rootPath = root.path
+                val targetPath = target.path
+                if (targetPath == rootPath || targetPath.startsWith("$rootPath${File.separator}")) {
+                    target
+                } else {
+                    null
+                }
+            } catch (_: IOException) {
+                null
             }
         }
     }

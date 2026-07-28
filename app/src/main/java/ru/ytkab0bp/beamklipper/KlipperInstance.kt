@@ -52,19 +52,16 @@ class KlipperInstance {
         notifyStateChanged(State.STARTING)
 
         if (!directory.exists() && !directory.mkdirs()) {
-            Log.w(TAG, "Failed to create instance directory ($id)")
-            stop()
+            failStart("Failed to create instance directory ($id)")
             return
         }
         if (!publicDirectory.exists() && !publicDirectory.mkdirs()) {
-            Log.w(TAG, "Failed to create public instance directory ($id)")
-            stop()
+            failStart("Failed to create public instance directory ($id)")
             return
         }
         val config = File(publicDirectory, "printer_data")
         if (!config.exists() && !config.mkdirs()) {
-            Log.w(TAG, "Failed to create data directory ($id)")
-            stop()
+            failStart("Failed to create data directory ($id)")
             return
         }
 
@@ -80,42 +77,57 @@ class KlipperInstance {
                 }
             }
         } else {
-            throw IllegalStateException("Can't start $id: out of slots")
+            failStart("Can't start $id: out of slots")
+            return
         }
         slots[this] = slot
         try {
             val kIntent = Intent(KlipperApp.INSTANCE, Class.forName("ru.ytkab0bp.beamklipper.service.KlippyService_$slot"))
             klippyIntent = kIntent
             kIntent.putExtra(BasePythonService.KEY_INSTANCE, id)
-            KlipperApp.INSTANCE.bindService(kIntent, object : ServiceConnection {
+            val bound = KlipperApp.INSTANCE.bindService(kIntent, object : ServiceConnection {
                 override fun onServiceConnected(name: ComponentName, service: IBinder) {
                     klippyConnected = true
-                    if (moonrakerConnected) {
+                    if (state == State.STARTING && moonrakerConnected) {
                         notifyStateChanged(State.RUNNING)
                     }
                 }
 
-                override fun onServiceDisconnected(name: ComponentName) {}
+                override fun onServiceDisconnected(name: ComponentName) {
+                    onKlippyUnbound()
+                }
             }.also { klippyConnection = it }, Context.BIND_AUTO_CREATE)
+            if (!bound) {
+                failStart("Failed to bind Klippy service for $id")
+                return
+            }
         } catch (e: ClassNotFoundException) {
-            throw RuntimeException(e)
+            failStart("Klippy service class is missing for slot $slot", e)
+            return
         }
         try {
             val mIntent = Intent(KlipperApp.INSTANCE, Class.forName("ru.ytkab0bp.beamklipper.service.MoonrakerService_$slot"))
             moonrakerIntent = mIntent
             mIntent.putExtra(BasePythonService.KEY_INSTANCE, id)
-            KlipperApp.INSTANCE.bindService(mIntent, object : ServiceConnection {
+            val bound = KlipperApp.INSTANCE.bindService(mIntent, object : ServiceConnection {
                 override fun onServiceConnected(name: ComponentName, service: IBinder) {
                     moonrakerConnected = true
-                    if (klippyConnected) {
+                    if (state == State.STARTING && klippyConnected) {
                         notifyStateChanged(State.RUNNING)
                     }
                 }
 
-                override fun onServiceDisconnected(name: ComponentName) {}
+                override fun onServiceDisconnected(name: ComponentName) {
+                    onMoonrakerUnbound()
+                }
             }.also { moonrakerConnection = it }, Context.BIND_AUTO_CREATE)
+            if (!bound) {
+                failStart("Failed to bind Moonraker service for $id")
+                return
+            }
         } catch (e: ClassNotFoundException) {
-            throw RuntimeException(e)
+            failStart("Moonraker service class is missing for slot $slot", e)
+            return
         }
         if (remoteId != null) {
             try {
@@ -152,30 +164,29 @@ class KlipperInstance {
     }
 
     fun stop() {
-        if (state != State.RUNNING) return
+        if (state == State.IDLE || state == State.STOPPING) return
         notifyStateChanged(State.STOPPING)
 
         val nm = KlipperApp.INSTANCE.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (klippyConnection != null) {
-            KlipperApp.INSTANCE.unbindService(klippyConnection!!)
-            KlipperApp.INSTANCE.stopService(klippyIntent)
-            onKlippyUnbound()
-            nm.cancel(BaseKlippyService.BASE_ID + slot)
-        }
-        if (moonrakerConnection != null) {
-            KlipperApp.INSTANCE.unbindService(moonrakerConnection!!)
-            KlipperApp.INSTANCE.stopService(moonrakerIntent)
-            onMoonrakerUnbound()
-            nm.cancel(BaseMoonrakerService.BASE_ID + slot)
+        val currentSlot = slot
+        cleanupBoundServices()
+        if (currentSlot >= 0) {
+            nm.cancel(BaseKlippyService.BASE_ID + currentSlot)
+            nm.cancel(BaseMoonrakerService.BASE_ID + currentSlot)
         }
         remoteBeamConnection?.disconnect()
         remoteBeamConnection = null
+        notifyStateChanged(State.IDLE)
     }
 
     private fun onKlippyUnbound() {
         klippyConnection = null
         klippyConnected = false
-        if (!moonrakerConnected) {
+        if (moonrakerConnected && state != State.IDLE && state != State.STOPPING) {
+            stop()
+            return
+        }
+        if (!moonrakerConnected && state != State.IDLE) {
             notifyStateChanged(State.IDLE)
         }
     }
@@ -183,9 +194,38 @@ class KlipperInstance {
     private fun onMoonrakerUnbound() {
         moonrakerConnection = null
         moonrakerConnected = false
-        if (!klippyConnected) {
+        if (klippyConnected && state != State.IDLE && state != State.STOPPING) {
+            stop()
+            return
+        }
+        if (!klippyConnected && state != State.IDLE) {
             notifyStateChanged(State.IDLE)
         }
+    }
+
+    private fun cleanupBoundServices() {
+        safeUnbindService(klippyConnection)
+        safeUnbindService(moonrakerConnection)
+        klippyConnection = null
+        moonrakerConnection = null
+        klippyConnected = false
+        moonrakerConnected = false
+        klippyIntent?.let { KlipperApp.INSTANCE.stopService(it) }
+        moonrakerIntent?.let { KlipperApp.INSTANCE.stopService(it) }
+        klippyIntent = null
+        moonrakerIntent = null
+    }
+
+    private fun failStart(message: String, error: Throwable? = null) {
+        if (error != null) {
+            Log.e(TAG, message, error)
+        } else {
+            Log.w(TAG, message)
+        }
+        cleanupBoundServices()
+        remoteBeamConnection?.disconnect()
+        remoteBeamConnection = null
+        notifyStateChanged(State.IDLE)
     }
 
     private fun notifyStateChanged(state: State) {
@@ -194,16 +234,17 @@ class KlipperInstance {
 
         if (state == State.IDLE) {
             slots.remove(this)
+            slot = -1
             if (slots.isEmpty()) {
                 if (webServerConnection != null) {
                     KlipperApp.EVENT_BUS.fireEvent(WebStateChangedEvent(State.STOPPING))
-                    KlipperApp.INSTANCE.unbindService(webServerConnection!!)
+                    safeUnbindService(webServerConnection)
                     KlipperApp.INSTANCE.stopService(Intent(KlipperApp.INSTANCE, WebService::class.java))
                     KlipperApp.EVENT_BUS.fireEvent(WebStateChangedEvent(State.IDLE))
                     webServerConnection = null
                 }
                 if (cameraServerConnection != null) {
-                    KlipperApp.INSTANCE.unbindService(cameraServerConnection!!)
+                    safeUnbindService(cameraServerConnection)
                     KlipperApp.INSTANCE.stopService(Intent(KlipperApp.INSTANCE, CameraService::class.java))
                     cameraServerConnection = null
                 }
@@ -211,21 +252,37 @@ class KlipperInstance {
         } else if (state == State.RUNNING) {
             if (webServerConnection == null) {
                 KlipperApp.EVENT_BUS.fireEvent(WebStateChangedEvent(State.STARTING))
-                KlipperApp.INSTANCE.bindService(Intent(KlipperApp.INSTANCE, WebService::class.java), object : ServiceConnection {
+                val connection = object : ServiceConnection {
                     override fun onServiceConnected(name: ComponentName, service: IBinder) {
                         KlipperApp.EVENT_BUS.fireEvent(WebStateChangedEvent(State.RUNNING))
                     }
 
-                    override fun onServiceDisconnected(name: ComponentName) {}
-                }.also { webServerConnection = it }, Context.BIND_AUTO_CREATE)
+                    override fun onServiceDisconnected(name: ComponentName) {
+                        webServerConnection = null
+                        KlipperApp.EVENT_BUS.fireEvent(WebStateChangedEvent(State.IDLE))
+                    }
+                }
+                webServerConnection = connection
+                if (!KlipperApp.INSTANCE.bindService(Intent(KlipperApp.INSTANCE, WebService::class.java), connection, Context.BIND_AUTO_CREATE)) {
+                    webServerConnection = null
+                    KlipperApp.EVENT_BUS.fireEvent(WebStateChangedEvent(State.IDLE))
+                    Log.e(TAG, "Failed to bind web service")
+                }
             }
 
             if (Prefs.isCameraEnabled) {
                 if (cameraServerConnection == null) {
-                    KlipperApp.INSTANCE.bindService(Intent(KlipperApp.INSTANCE, CameraService::class.java), object : ServiceConnection {
+                    val connection = object : ServiceConnection {
                         override fun onServiceConnected(name: ComponentName, service: IBinder) {}
-                        override fun onServiceDisconnected(name: ComponentName) {}
-                    }.also { cameraServerConnection = it }, Context.BIND_AUTO_CREATE)
+                        override fun onServiceDisconnected(name: ComponentName) {
+                            cameraServerConnection = null
+                        }
+                    }
+                    cameraServerConnection = connection
+                    if (!KlipperApp.INSTANCE.bindService(Intent(KlipperApp.INSTANCE, CameraService::class.java), connection, Context.BIND_AUTO_CREATE)) {
+                        cameraServerConnection = null
+                        Log.e(TAG, "Failed to bind camera service")
+                    }
                 }
             }
         }
@@ -301,14 +358,30 @@ class KlipperInstance {
         @JvmStatic
         fun onCameraConfigChanged(enable: Boolean) {
             if (cameraServerConnection == null && slots.isNotEmpty() && enable) {
-                KlipperApp.INSTANCE.bindService(Intent(KlipperApp.INSTANCE, CameraService::class.java), object : ServiceConnection {
+                val connection = object : ServiceConnection {
                     override fun onServiceConnected(name: ComponentName, service: IBinder) {}
-                    override fun onServiceDisconnected(name: ComponentName) {}
-                }.also { cameraServerConnection = it }, Context.BIND_AUTO_CREATE)
+                    override fun onServiceDisconnected(name: ComponentName) {
+                        cameraServerConnection = null
+                    }
+                }
+                cameraServerConnection = connection
+                if (!KlipperApp.INSTANCE.bindService(Intent(KlipperApp.INSTANCE, CameraService::class.java), connection, Context.BIND_AUTO_CREATE)) {
+                    cameraServerConnection = null
+                    Log.e(TAG, "Failed to bind camera service")
+                }
             } else if (cameraServerConnection != null && !enable) {
-                KlipperApp.INSTANCE.unbindService(cameraServerConnection!!)
+                safeUnbindService(cameraServerConnection)
                 KlipperApp.INSTANCE.stopService(Intent(KlipperApp.INSTANCE, CameraService::class.java))
                 cameraServerConnection = null
+            }
+        }
+
+        private fun safeUnbindService(connection: ServiceConnection?) {
+            if (connection == null) return
+            try {
+                KlipperApp.INSTANCE.unbindService(connection)
+            } catch (e: IllegalArgumentException) {
+                Log.w(TAG, "Service was not bound", e)
             }
         }
     }

@@ -18,15 +18,22 @@ def commit = getGitCommitHash(file('.'))
 
 def keystorePropertiesFile = rootProject.file('local.properties')
 def keystoreProperties = new Properties()
-keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+def hasReleaseSigning = ['key.store', 'key.store.password', 'key.alias', 'key.key.password'].every {
+    keystoreProperties[it]
+}
 
 android {
     signingConfigs {
-        release {
-            storeFile file(keystoreProperties['key.store'])
-            storePassword keystoreProperties['key.store.password']
-            keyAlias keystoreProperties['key.alias']
-            keyPassword keystoreProperties['key.key.password']
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(keystoreProperties['key.store'])
+                storePassword keystoreProperties['key.store.password']
+                keyAlias keystoreProperties['key.alias']
+                keyPassword keystoreProperties['key.key.password']
+            }
         }
     }
     namespace 'ru.ytkab0bp.beamklipper'
@@ -84,7 +91,11 @@ android {
 
     buildTypes {
         release {
-            signingConfig signingConfigs.release
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            } else {
+                println("Release signing is not configured; release builds will be unsigned.")
+            }
             buildConfigField "boolean", "IS_GOOGLE_PLAY", "false"
             buildConfigField "String", "COMMIT", "\"" + commit + "\""
             minifyEnabled false

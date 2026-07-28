@@ -24,6 +24,7 @@ import org.java_websocket.handshake.ServerHandshake
 import org.nanohttpd.protocols.http.IHTTPSession
 import org.nanohttpd.protocols.http.request.Method
 import org.nanohttpd.protocols.http.response.Response
+import org.nanohttpd.protocols.http.response.IStatus
 import org.nanohttpd.protocols.http.response.Status
 import org.nanohttpd.protocols.websockets.CloseCode
 import org.nanohttpd.protocols.websockets.NanoWSD
@@ -38,8 +39,8 @@ import ru.ytkab0bp.beamklipper.serial.UsbSerialManager
 import ru.ytkab0bp.beamklipper.utils.Prefs
 import ru.ytkab0bp.beamklipper.utils.ViewUtils
 import java.io.File
+import java.io.ByteArrayInputStream
 import java.io.IOException
-import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.URI
@@ -173,7 +174,9 @@ class WebService : Service() {
                 response.addHeader("Cache-Control", "max-age=604800")
                 return response
             } catch (e: IOException) {
-                if (Prefs.isMainsailEnabled) return serveStatic("/index.html")
+                if (Prefs.isMainsailEnabled && resolvedPath != "/index.html" && !resolvedPath.contains('.')) {
+                    return serveStatic("/index.html")
+                }
                 return Response.newFixedLengthResponse(Status.NOT_FOUND, "text/plain", "Not Found")
             }
         }
@@ -185,15 +188,25 @@ class WebService : Service() {
             }
 
         private fun checkRemote(session: IHTTPSession): Boolean =
-            "127.0.0.1" != session.remoteIpAddress
+            session.remoteIpAddress !in setOf("127.0.0.1", "::1", "0:0:0:0:0:0:0:1")
+
+        private fun mapStatus(code: Int): IStatus {
+            return Status.lookup(code) ?: object : IStatus {
+                override fun getDescription(): String = code.toString()
+                override fun getRequestStatus(): Int = code
+            }
+        }
 
         override fun serve(session: IHTTPSession): Response {
             when (session.uri) {
                 "/beam/arduino_reset" -> {
                     if (checkRemote(session)) return Response.newFixedLengthResponse("")
                     val serial = session.parameters["serial"]?.get(0) ?: return Response.newFixedLengthResponse("")
-                    val uid = serial.substring(
-                        File(KlipperApp.INSTANCE.filesDir, "serial").absolutePath.length + 1)
+                    val serialRoot = File(KlipperApp.INSTANCE.filesDir, "serial").absolutePath + File.separator
+                    if (!serial.startsWith(serialRoot)) {
+                        return Response.newFixedLengthResponse("{\"ok\": false}")
+                    }
+                    val uid = serial.substring(serialRoot.length)
                     val device = UsbSerialManager.getDevice(uid)
                     if (device != null) {
                         UsbSerialManager.close(uid)
@@ -246,29 +259,54 @@ class WebService : Service() {
             val m = API_PATTERN.matcher(session.uri)
             if (m.find()) {
                 try {
-                    val con = URL("http://127.0.0.1:${getMoonrakerPort()}/${session.uri.substring(1)}?${session.queryParameterString}")
-                        .openConnection() as HttpURLConnection
-                    con.requestMethod = session.method.name
-                    if (session.method == Method.POST || session.method == Method.PUT || session.method == Method.PATCH) {
-                        for ((key, value) in session.headers) {
-                            con.addRequestProperty(key, value)
+                    val targetUrl = buildString {
+                        append("http://127.0.0.1:")
+                        append(getMoonrakerPort())
+                        append("/")
+                        append(session.uri.substring(1))
+                        session.queryParameterString?.takeIf { it.isNotEmpty() }?.let {
+                            append("?")
+                            append(it)
                         }
+                    }
+                    val con = URL(targetUrl).openConnection() as HttpURLConnection
+                    con.requestMethod = session.method.name
+                    con.instanceFollowRedirects = false
+                    con.connectTimeout = 5000
+                    con.readTimeout = 15000
+                    con.doInput = true
+                    for ((key, value) in session.headers) {
+                        if (key.equals("host", ignoreCase = true) || key.equals("connection", ignoreCase = true)) {
+                            continue
+                        }
+                        con.setRequestProperty(key, value)
+                    }
+                    if (session.method == Method.POST || session.method == Method.PUT || session.method == Method.PATCH) {
+                        con.doOutput = true
                         val len = session.headers["content-length"]?.toLongOrNull() ?: 0L
                         val input = session.inputStream
-                        val output = con.outputStream
-                        val buffer = ByteArray(10240)
-                        var totalWritten = 0
-                        while (totalWritten < len) {
-                            val c = input.read(buffer)
-                            if (c == -1) break
-                            output.write(buffer, 0, c)
-                            totalWritten += c
+                        con.outputStream.use { output ->
+                            val buffer = ByteArray(10240)
+                            var totalWritten = 0L
+                            while (totalWritten < len) {
+                                val requested = minOf(buffer.size.toLong(), len - totalWritten).toInt()
+                                val c = input.read(buffer, 0, requested)
+                                if (c == -1) break
+                                output.write(buffer, 0, c)
+                                totalWritten += c
+                            }
                         }
-                        output.close()
                     }
-                    val responseStream = if (con.responseCode in 200..299) con.inputStream else con.errorStream
-                    val r = Response.newChunkedResponse(Status.OK, con.contentType, responseStream)
+                    val responseCode = con.responseCode
+                    val responseStream = when {
+                        responseCode in 200..299 -> con.inputStream
+                        con.errorStream != null -> con.errorStream
+                        else -> ByteArrayInputStream(ByteArray(0))
+                    }
+                    val mimeType = con.contentType ?: "application/octet-stream"
+                    val r = Response.newChunkedResponse(mapStatus(responseCode), mimeType, responseStream)
                     for ((key, values) in con.headerFields) {
+                        if (key == null) continue
                         for (value in values) {
                             r.addHeader(key, value)
                         }
