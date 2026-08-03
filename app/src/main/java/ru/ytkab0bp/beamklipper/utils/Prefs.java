@@ -9,11 +9,13 @@ import android.preference.PreferenceManager;
 
 import ru.ytkab0bp.beamklipper.BuildConfig;
 import ru.ytkab0bp.beamklipper.KlipperApp;
+import ru.ytkab0bp.beamklipper.events.EngineChangedEvent;
 import ru.ytkab0bp.beamklipper.events.WebFrontendChangedEvent;
 import ru.ytkab0bp.beamklipper.serial.UsbSerialManager;
 
 public class Prefs {
     public final static int USB_DEVICE_NAMING_BY_PATH = 0, USB_DEVICE_NAMING_BY_VID_PID = 1;
+    public final static int ENGINE_KALICO = 0, ENGINE_KLIPPER = 1;
 
     private static SharedPreferences mPrefs;
 
@@ -143,6 +145,19 @@ public class Prefs {
 
     public static boolean isMainsailEnabled() {
         return mPrefs.getBoolean("mainsail", true);
+    }
+
+    public static int getEngine() {
+        return mPrefs.getInt("engine", ENGINE_KALICO);
+    }
+
+    public static void setEngine(int engine) {
+        mPrefs.edit().putInt("engine", engine).apply();
+        KlipperApp.EVENT_BUS.fireEvent(new EngineChangedEvent());
+    }
+
+    public static String getEngineKey() {
+        return getEngine() == ENGINE_KLIPPER ? "klipper3d" : "klipper";
     }
 
     public static int getCameraWidth() {

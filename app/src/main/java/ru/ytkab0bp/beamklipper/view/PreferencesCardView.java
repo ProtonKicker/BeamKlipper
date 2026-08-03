@@ -76,6 +76,7 @@ public class PreferencesCardView extends FrameLayout {
     private int generalHeaderRow;
     private int systemSettingsRow;
     private int frontendRow;
+    private int engineRow;
     private int cameraHeaderRow;
     private int cameraEnabledRow;
     private int usbHeaderRow;
@@ -246,6 +247,35 @@ public class PreferencesCardView extends FrameLayout {
                                         Prefs.setMainsailEnabled(which == 1);
                                         notifyItemChanged(holder.getAdapterPosition());
                                     }).show());
+                        } else if (position == engineRow) {
+                            val.bind(KlipperApp.INSTANCE.getString(R.string.FirmwareEngine), KlipperApp.INSTANCE.getString(Prefs.getEngine() == Prefs.ENGINE_KLIPPER ? R.string.Klipper : R.string.Kalico));
+                            val.setOnClickListener(v -> new MaterialAlertDialogBuilder(v.getContext())
+                                    .setTitle(R.string.FirmwareEngine)
+                                    .setItems(new CharSequence[] {
+                                            KlipperApp.INSTANCE.getString(R.string.Kalico),
+                                            KlipperApp.INSTANCE.getString(R.string.Klipper)
+                                    }, (dialog, which) -> {
+                                        if (which == 1 && !new File(KlipperApp.INSTANCE.getFilesDir(), "klipper3d/klippy/klippy.py").exists()) {
+                                            new MaterialAlertDialogBuilder(v.getContext())
+                                                    .setTitle(R.string.Error)
+                                                    .setMessage(R.string.EngineNotBundled)
+                                                    .setPositiveButton(android.R.string.ok, null)
+                                                    .show();
+                                            return;
+                                        }
+                                        Prefs.setEngine(which == 1 ? Prefs.ENGINE_KLIPPER : Prefs.ENGINE_KALICO);
+                                        notifyItemChanged(holder.getAdapterPosition());
+                                        for (KlipperInstance inst : KlipperInstance.getInstances()) {
+                                            if (inst.getState() == KlipperInstance.State.RUNNING) {
+                                                new MaterialAlertDialogBuilder(v.getContext())
+                                                        .setTitle(R.string.FirmwareEngine)
+                                                        .setMessage(R.string.EngineRestartRequired)
+                                                        .setPositiveButton(android.R.string.ok, null)
+                                                        .show();
+                                                break;
+                                            }
+                                        }
+                                    }).show());
                         }
                         break;
                 }
@@ -264,7 +294,7 @@ public class PreferencesCardView extends FrameLayout {
                     return VIEW_TYPE_HEADER;
                 } else if (position == listUsbRow || position == accountStatusRow || position == systemSettingsRow || position == getMCUFirmwareRow) {
                     return VIEW_TYPE_PREFERENCE;
-                } else if (position == usbNamingRow || position == frontendRow) {
+                } else if (position == usbNamingRow || position == frontendRow || position == engineRow) {
                     return VIEW_TYPE_PREF_VALUE;
                 }
                 return 0;
@@ -320,6 +350,7 @@ public class PreferencesCardView extends FrameLayout {
             systemSettingsRow = -1;
         }
         frontendRow = itemsCount++;
+        engineRow = itemsCount++;
         cameraHeaderRow = itemsCount++;
         cameraEnabledRow = itemsCount++;
         usbHeaderRow = itemsCount++;

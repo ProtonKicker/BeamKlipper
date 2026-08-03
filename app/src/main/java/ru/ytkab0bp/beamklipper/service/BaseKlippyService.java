@@ -20,6 +20,7 @@ import ru.ytkab0bp.beamklipper.BundleInstaller;
 import ru.ytkab0bp.beamklipper.KlipperApp;
 import ru.ytkab0bp.beamklipper.KlipperInstance;
 import ru.ytkab0bp.beamklipper.R;
+import ru.ytkab0bp.beamklipper.utils.Prefs;
 
 public class BaseKlippyService extends BasePythonService {
     public final static int BASE_ID = 100000;
@@ -104,7 +105,7 @@ public class BaseKlippyService extends BasePythonService {
                     fos.close();
                 }
             } catch (Exception ignored) {}
-            runPython(new File(KlipperApp.INSTANCE.getFilesDir(), "klipper/klippy"), "klippy", "klippy.py", "-B", virtualInput.getAbsolutePath(), "-l", logs.getAbsolutePath(), "-a", socket.getAbsolutePath(), printerCfg.getAbsolutePath());
+            runPython(new File(KlipperApp.INSTANCE.getFilesDir(), Prefs.getEngineKey() + "/klippy"), "klippy", "klippy.py", "-B", virtualInput.getAbsolutePath(), "-l", logs.getAbsolutePath(), "-a", socket.getAbsolutePath(), printerCfg.getAbsolutePath());
         } catch (Exception e) {
             Log.e("klippy_" + index, "Failed to start klippy", e);
         }
