@@ -55,9 +55,14 @@
     <string name="BeamRemoteAccessTooManyPrinters">Too many printers.\nPlease select one to delete</string>
     <string name="Fluidd" translatable="false">Fluidd</string>
     <string name="Mainsail" translatable="false">Mainsail</string>
+    <string name="Kalico" translatable="false">Kalico</string>
+    <string name="Klipper" translatable="false">Klipper</string>
     <string name="IPInfo" translatable="false">http://%s:%d/</string>
     <string name="General">General</string>
     <string name="WebFrontend">Web frontend</string>
+    <string name="FirmwareEngine">Firmware engine</string>
+    <string name="EngineNotBundled">This engine isn’t bundled in this build.</string>
+    <string name="EngineRestartRequired">Restart running profiles to apply this change.</string>
     <string name="UploadLogs">Upload logs to CODeRUS\' server</string>
     <string name="UploadFailed">Upload failed!</string>
     <string name="UploadSuccess">Upload finished</string>

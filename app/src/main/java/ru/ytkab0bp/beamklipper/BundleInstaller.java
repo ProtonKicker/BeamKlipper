@@ -30,6 +30,7 @@ public class BundleInstaller {
             if (!prefs.getString("version", "").equals(ver)) {
                 JSONObject index = new JSONObject(readString(assets, "index.json"));
                 unpack(assets, index, root, "klipper");
+                unpack(assets, index, root, "klipper3d");
                 unpack(assets, index, root, "moonraker");
 
                 prefs.edit().putString("version", ver).apply();
@@ -38,33 +39,26 @@ public class BundleInstaller {
             File nativeDir = new File(info.applicationInfo.nativeLibraryDir);
             File lib = new File(nativeDir, "libklippy_chelper.so");
 
-            String str = readString(assets, "klipper/klippy/chelper/__init__.py");
-            str = str.replace("${DEST_LIB}", lib.getAbsolutePath());
             if (!prefs.getString("native_lib", "").equals(lib.getAbsolutePath())) {
-                FileOutputStream fos = new FileOutputStream(new File(root, "klipper/klippy/chelper/__init__.py"));
-                fos.write(str.getBytes(StandardCharsets.UTF_8));
-                fos.close();
+                patchKlippyFileIfExists(assets, root, "klipper", "klippy/chelper/__init__.py", s -> s.replace("${DEST_LIB}", lib.getAbsolutePath()));
+                patchKlippyFileIfExists(assets, root, "klipper3d", "klippy/chelper/__init__.py", s -> s.replace("${DEST_LIB}", lib.getAbsolutePath()));
 
                 prefs.edit().putString("native_lib", lib.getAbsolutePath()).apply();
             }
 
-            str = readString(assets, "moonraker/moonraker/utils/sysfs_devs.py");
+            String str = readString(assets, "moonraker/moonraker/utils/sysfs_devs.py");
             str = str.replace("TTY_PATH = \"/sys/class/tty\"", "TTY_PATH = \"" + new File(KlipperApp.INSTANCE.getFilesDir(), "serial").getAbsolutePath() + "\"");
             FileOutputStream fos = new FileOutputStream(new File(root, "moonraker/moonraker/utils/sysfs_devs.py"));
             fos.write(str.getBytes(StandardCharsets.UTF_8));
             fos.close();
 
-            str = readString(assets, "klipper/klippy/extras/resonance_tester.py");
-            str = str.replace("${TEMP_PATH}", new File(KlipperApp.INSTANCE.getCacheDir(), "resonances").getAbsolutePath());
-            fos = new FileOutputStream(new File(root, "klipper/klippy/extras/resonance_tester.py"));
-            fos.write(str.getBytes(StandardCharsets.UTF_8));
-            fos.close();
+            String tempPath = new File(KlipperApp.INSTANCE.getCacheDir(), "resonances").getAbsolutePath();
+            patchKlippyFileIfExists(assets, root, "klipper", "klippy/extras/resonance_tester.py", s -> s.replace("${TEMP_PATH}", tempPath));
+            patchKlippyFileIfExists(assets, root, "klipper3d", "klippy/extras/resonance_tester.py", s -> s.replace("${TEMP_PATH}", tempPath));
 
-            str = readString(assets, "klipper/klippy/mcu.py");
-            str = str.replace("${TTY_PATH}", "'" + new File(KlipperApp.INSTANCE.getFilesDir(), "serial").getAbsolutePath() + "'");
-            fos = new FileOutputStream(new File(root, "klipper/klippy/mcu.py"));
-            fos.write(str.getBytes(StandardCharsets.UTF_8));
-            fos.close();
+            String ttyPath = "'" + new File(KlipperApp.INSTANCE.getFilesDir(), "serial").getAbsolutePath() + "'";
+            patchKlippyFileIfExists(assets, root, "klipper", "klippy/mcu.py", s -> s.replace("${TTY_PATH}", ttyPath));
+            patchKlippyFileIfExists(assets, root, "klipper3d", "klippy/mcu.py", s -> s.replace("${TTY_PATH}", ttyPath));
         } catch (IOException | JSONException | PackageManager.NameNotFoundException e) {
             throw new RuntimeException(e);
         }
@@ -85,6 +79,9 @@ public class BundleInstaller {
         deleteRecur(dir);
 
         JSONArray arr = index.optJSONArray(key);
+        if (arr == null) {
+            return;
+        }
         byte[] buffer = new byte[10240]; int c;
         for (int i = 0; i < arr.length(); i++) {
             String file = arr.optString(i);
@@ -99,6 +96,22 @@ public class BundleInstaller {
             in.close();
             fos.close();
         }
+    }
+
+    private interface StringTransformer {
+        String transform(String s);
+    }
+
+    private static void patchKlippyFileIfExists(AssetManager assets, File root, String key, String relativePath, StringTransformer transform) throws IOException {
+        File f = new File(root, key + File.separator + relativePath);
+        if (!f.exists()) {
+            return;
+        }
+        String s = readString(assets, key + "/" + relativePath);
+        s = transform.transform(s);
+        FileOutputStream fos = new FileOutputStream(f);
+        fos.write(s.getBytes(StandardCharsets.UTF_8));
+        fos.close();
     }
 
     public static String readString(AssetManager assets, String key) throws IOException {

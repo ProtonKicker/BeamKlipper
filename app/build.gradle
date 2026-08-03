@@ -275,10 +275,12 @@ tasks.register('bundleKlipper') {
     doFirst {
         var assets = file('src/main/assets')
         var versionFile = new File(assets, 'bundle_version')
-        var version = 'kalico-' + getGitCommitHash(file('src/main/klipper')) + '_moonraker-' + getGitCommitHash(file('src/main/moonraker')) + '_happyhare-' + getGitCommitHash(file('src/main/happyhare')) + '_klipper_tmc_autotune-' + getGitCommitHash(file('src/main/klipper_tmc_autotune')) + '_moonraker_timelapse-' + getGitCommitHash(file('src/main/moonraker_timelapse')) + '_beamext-' + file('src/main/assets/klipper/beam_ext/ext_version').text
+        var klipper3dHash = file('src/main/klipper3d').exists() ? getGitCommitHash(file('src/main/klipper3d')) : 'none'
+        var version = 'kalico-' + getGitCommitHash(file('src/main/klipper')) + '_klipper3d-' + klipper3dHash + '_moonraker-' + getGitCommitHash(file('src/main/moonraker')) + '_happyhare-' + getGitCommitHash(file('src/main/happyhare')) + '_klipper_tmc_autotune-' + getGitCommitHash(file('src/main/klipper_tmc_autotune')) + '_moonraker_timelapse-' + getGitCommitHash(file('src/main/moonraker_timelapse')) + '_beamext-' + file('src/main/assets/klipper/beam_ext/ext_version').text
         if (!versionFile.exists() || versionFile.text != version) {
             var files = new ArrayList<File>()
             collectFiles(file('src/main/assets/klipper/klippy'), files)
+            collectFiles(file('src/main/assets/klipper3d/klippy'), files)
             collectFiles(file('src/main/assets/moonraker/moonraker'), files)
             files.each {
                 it.delete()
@@ -368,6 +370,65 @@ tasks.register('bundleKlipper') {
 
             JSONObject index = new JSONObject()
             index.put('klipper', arr)
+
+            if (file('src/main/klipper3d/klippy').exists()) {
+                arr = new JSONArray()
+                klippy = file('src/main/klipper3d/klippy')
+                files.clear()
+                collectFiles(klippy, files)
+                files.each {
+                    var sub = it.getAbsolutePath().substring(klippy.getAbsolutePath().length() + 1).replace('\\', '/')
+                    if (sub.startsWith(".") || sub.contains("/.")) return
+                    arr.put('klippy/' + sub)
+                    var f = new File(assets, 'klipper3d/klippy/' + sub)
+                    f.getParentFile().mkdirs()
+                    Files.copy(it.toPath(), f.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                }
+
+                files.clear()
+                klippy = file('src/main/happyhare/extras')
+                collectFiles(klippy, files)
+                files.each {
+                    if (it.getName() == ".pylintrc") return
+
+                    var sub = it.getAbsolutePath().substring(klippy.getAbsolutePath().length() + 1).replace('\\', '/')
+                    if (sub.startsWith(".") || sub.contains("/.")) return
+                    arr.put('klippy/extras/' + sub)
+                    var f = new File(assets, 'klipper3d/klippy/extras/' + sub)
+                    f.getParentFile().mkdirs()
+                    Files.copy(it.toPath(), f.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                }
+
+                files.clear()
+                klippy = file('src/main/klipper_tmc_autotune')
+                collectFiles(klippy, files)
+                files.each {
+                    if (!it.getName().endsWith(".py") && !it.getName().endsWith(".cfg")) return
+
+                    var sub = it.getAbsolutePath().substring(klippy.getAbsolutePath().length() + 1).replace('\\', '/')
+                    if (sub.startsWith(".") || sub.contains("/.")) return
+                    arr.put('klippy/extras/' + sub)
+                    var f = new File(assets, 'klipper3d/klippy/extras/' + sub)
+                    f.getParentFile().mkdirs()
+                    Files.copy(it.toPath(), f.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                }
+
+                files.clear()
+                klippy = file('src/main/assets/klipper/beam_ext')
+                collectFiles(klippy, files)
+                files.each {
+                    if (it.getName() == "ext_version") return
+
+                    var sub = it.getAbsolutePath().substring(klippy.getAbsolutePath().length() + 1).replace('\\', '/')
+                    if (sub.startsWith(".") || sub.contains("/.")) return
+                    arr.put('klippy/extras/' + sub)
+                    var f = new File(assets, 'klipper3d/klippy/extras/' + sub)
+                    f.getParentFile().mkdirs()
+                    Files.copy(it.toPath(), f.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                }
+
+                index.put('klipper3d', arr)
+            }
 
             arr = new JSONArray()
             arr.put('bootstrap.py')
