@@ -8,7 +8,6 @@ import android.database.sqlite.SQLiteOpenHelper
 import ru.ytkab0bp.beamklipper.InstanceIcon
 import ru.ytkab0bp.beamklipper.KlipperApp
 import ru.ytkab0bp.beamklipper.KlipperInstance
-import ru.ytkab0bp.beamklipper.cloud.CloudAPI
 import ru.ytkab0bp.beamklipper.events.InstanceCreatedEvent
 import ru.ytkab0bp.beamklipper.events.InstanceDestroyedEvent
 import ru.ytkab0bp.beamklipper.events.InstanceUpdatedEvent
@@ -17,14 +16,12 @@ import java.io.File
 class BeamDB(context: Context?) : SQLiteOpenHelper(context, DB_NAME, null, VERSION) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
-            "CREATE TABLE IF NOT EXISTS $TABLE_INSTANCES ($COLUMN_ID TEXT, $COLUMN_NAME TEXT, $COLUMN_ICON TEXT, $COLUMN_AUTOSTART INTEGER, $COLUMN_REMOTE_ID TEXT, $COLUMN_REMOTE_TOKEN TEXT)")
+            "CREATE TABLE IF NOT EXISTS $TABLE_INSTANCES ($COLUMN_ID TEXT, $COLUMN_NAME TEXT, $COLUMN_ICON TEXT, $COLUMN_AUTOSTART INTEGER)"
+        )
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        if (oldVersion < 2) {
-            db.execSQL("ALTER TABLE $TABLE_INSTANCES ADD COLUMN $COLUMN_REMOTE_ID TEXT")
-            db.execSQL("ALTER TABLE $TABLE_INSTANCES ADD COLUMN $COLUMN_REMOTE_TOKEN TEXT")
-        }
+        // Legacy remote-access columns are ignored on upgraded installs.
     }
 
     fun getInstances(): List<KlipperInstance> {
@@ -38,8 +35,6 @@ class BeamDB(context: Context?) : SQLiteOpenHelper(context, DB_NAME, null, VERSI
             inst.name = cv.getAsString(COLUMN_NAME) ?: continue
             inst.icon = InstanceIcon.byKey(cv.getAsString(COLUMN_ICON) ?: continue)
             inst.autostart = cv[COLUMN_AUTOSTART] as? String == "1"
-            inst.remoteId = if (cv.containsKey(COLUMN_REMOTE_ID)) cv.getAsString(COLUMN_REMOTE_ID) else null
-            inst.remoteToken = if (cv.containsKey(COLUMN_REMOTE_TOKEN)) cv.getAsString(COLUMN_REMOTE_TOKEN) else null
             instances.add(inst)
         }
         c.close()
@@ -52,8 +47,6 @@ class BeamDB(context: Context?) : SQLiteOpenHelper(context, DB_NAME, null, VERSI
             put(COLUMN_NAME, inst.name)
             put(COLUMN_ICON, inst.icon.name)
             put(COLUMN_AUTOSTART, inst.autostart)
-            put(COLUMN_REMOTE_ID, inst.remoteId)
-            put(COLUMN_REMOTE_TOKEN, inst.remoteToken)
         }
         writableDatabase.insert(TABLE_INSTANCES, null, cv)
         KlipperInstance.onInstancesLoadedFromDB(getInstances())
@@ -66,8 +59,6 @@ class BeamDB(context: Context?) : SQLiteOpenHelper(context, DB_NAME, null, VERSI
             put(COLUMN_NAME, inst.name)
             put(COLUMN_ICON, inst.icon.name)
             put(COLUMN_AUTOSTART, inst.autostart)
-            put(COLUMN_REMOTE_ID, inst.remoteId)
-            put(COLUMN_REMOTE_TOKEN, inst.remoteToken)
         }
         writableDatabase.update(TABLE_INSTANCES, cv, "id = ?", arrayOf(inst.id))
         KlipperInstance.onInstancesLoadedFromDB(getInstances())
@@ -75,10 +66,6 @@ class BeamDB(context: Context?) : SQLiteOpenHelper(context, DB_NAME, null, VERSI
     }
 
     fun delete(inst: KlipperInstance) {
-        val remoteId = inst.remoteId
-        if (remoteId != null) {
-            CloudAPI.INSTANCE.remoteDeletePrinter(remoteId) {}
-        }
         writableDatabase.delete(TABLE_INSTANCES, "id = ?", arrayOf(inst.id))
         KlipperInstance.onInstancesLoadedFromDB(getInstances())
         deleteRecur(inst.directory)
@@ -87,14 +74,12 @@ class BeamDB(context: Context?) : SQLiteOpenHelper(context, DB_NAME, null, VERSI
 
     companion object {
         private const val DB_NAME = "beam.db"
-        private const val VERSION = 2
+        private const val VERSION = 3
         private const val TABLE_INSTANCES = "instances"
         private const val COLUMN_ID = "id"
         private const val COLUMN_NAME = "name"
         private const val COLUMN_ICON = "icon"
         private const val COLUMN_AUTOSTART = "autostart"
-        private const val COLUMN_REMOTE_ID = "remote_id"
-        private const val COLUMN_REMOTE_TOKEN = "remote_token"
 
         private fun deleteRecur(f: File) {
             if (f.isDirectory) {

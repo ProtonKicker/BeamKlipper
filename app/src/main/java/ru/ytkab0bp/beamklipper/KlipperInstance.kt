@@ -11,9 +11,7 @@ import ru.ytkab0bp.beamklipper.events.InstanceStateChangedEvent
 import ru.ytkab0bp.beamklipper.events.WebStateChangedEvent
 import ru.ytkab0bp.beamklipper.service.*
 import ru.ytkab0bp.beamklipper.utils.Prefs
-import ru.ytkab0bp.remotebeamlib.RemoteBeamConnection
 import java.io.File
-import java.io.IOException
 
 class KlipperInstance {
     @JvmField
@@ -24,13 +22,8 @@ class KlipperInstance {
     var icon: InstanceIcon = InstanceIcon.PRINTER
     @JvmField
     var autostart = false
-    @JvmField
-    var remoteId: String? = null
-    @JvmField
-    var remoteToken: String? = null
 
     private var state: State = State.IDLE
-    private var remoteBeamConnection: RemoteBeamConnection? = null
     private var klippyIntent: Intent? = null
     private var klippyConnection: ServiceConnection? = null
     private var klippyConnected = false
@@ -117,38 +110,6 @@ class KlipperInstance {
         } catch (e: ClassNotFoundException) {
             throw RuntimeException(e)
         }
-        if (remoteId != null) {
-            try {
-                val f = File(publicDirectory, "config/moonraker.conf")
-                val s = BaseMoonrakerService.readString(f)
-                val m = BaseMoonrakerService.MOONRAKER_PORT_PATTERN.matcher(s)
-                if (m.find()) {
-                    val port = m.group(1)?.toInt() ?: throw IOException("No port group")
-                    remoteBeamConnection = RemoteBeamConnection(remoteToken, "http://127.0.0.1:8888", "127.0.0.1:$port", object : RemoteBeamConnection.EventListener {
-                        override fun onConnected(conn: RemoteBeamConnection) {
-                            Log.d(TAG, "Remote connected")
-                        }
-
-                        override fun onError(conn: RemoteBeamConnection, e: Exception) {
-                            Log.e(TAG, "Remote error", e)
-                        }
-
-                        override fun onServerRejected(conn: RemoteBeamConnection, message: String) {
-                            Log.d(TAG, "Server rejected: $message")
-                        }
-
-                        override fun onDisconnected(conn: RemoteBeamConnection) {
-                            Log.d(TAG, "Remote disconnected")
-                        }
-                    })
-                    remoteBeamConnection?.connect()
-                } else {
-                    throw IOException("No match")
-                }
-            } catch (e: IOException) {
-                Log.e(TAG, "Failed to parse port", e)
-            }
-        }
     }
 
     fun stop() {
@@ -168,8 +129,6 @@ class KlipperInstance {
             onMoonrakerUnbound()
             nm.cancel(BaseMoonrakerService.BASE_ID + slot)
         }
-        remoteBeamConnection?.disconnect()
-        remoteBeamConnection = null
     }
 
     private fun onKlippyUnbound() {

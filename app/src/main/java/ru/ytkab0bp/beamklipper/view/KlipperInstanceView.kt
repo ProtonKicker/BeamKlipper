@@ -125,14 +125,22 @@ class KlipperInstanceView(context: Context) : LinearLayout(context) {
 
     fun bindWeb() {
         id = null
-        if (Prefs.isMainsailEnabled) {
-            icon.setImageResource(R.drawable.ic_sailing_24)
-            title.setText(R.string.Mainsail)
-            setColorIndex(6)
-        } else {
-            icon.setImageResource(R.drawable.ic_square_stack_up_outline_28)
-            title.setText(R.string.Fluidd)
-            setColorIndex(9)
+        when (Prefs.webFrontend) {
+            Prefs.FRONTEND_FLUIDD -> {
+                icon.setImageResource(R.drawable.ic_square_stack_up_outline_28)
+                title.setText(R.string.Fluidd)
+                setColorIndex(9)
+            }
+            Prefs.FRONTEND_KALICO -> {
+                icon.setImageResource(R.drawable.ic_sailing_24)
+                title.setText(R.string.Kalico)
+                setColorIndex(4)
+            }
+            else -> {
+                icon.setImageResource(R.drawable.ic_sailing_24)
+                title.setText(R.string.Mainsail)
+                setColorIndex(6)
+            }
         }
 
         val visible = KlipperInstance.isWebServerRunning()

@@ -6,15 +6,27 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
 import android.preference.PreferenceManager
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 
 import ru.ytkab0bp.beamklipper.BuildConfig
 import ru.ytkab0bp.beamklipper.KlipperApp
+import ru.ytkab0bp.beamklipper.events.EngineChangedEvent
 import ru.ytkab0bp.beamklipper.events.WebFrontendChangedEvent
 import ru.ytkab0bp.beamklipper.serial.UsbSerialManager
 
 object Prefs {
     const val USB_DEVICE_NAMING_BY_PATH = 0
     const val USB_DEVICE_NAMING_BY_VID_PID = 1
+    const val ENGINE_KLIPPER = "klipper"
+    const val ENGINE_KALICO = "kalico"
+    const val FRONTEND_FLUIDD = "fluidd"
+    const val FRONTEND_MAINSAIL = "mainsail"
+    const val FRONTEND_KALICO = "kalico_frontend"
+    const val LANGUAGE_SYSTEM = "system"
+    const val LANGUAGE_ENGLISH = "en"
+    const val LANGUAGE_CHINESE_SIMPLIFIED = "zh-CN"
+    const val LANGUAGE_CHINESE_TRADITIONAL = "zh-TW"
 
     private lateinit var mPrefs: SharedPreferences
 
@@ -22,68 +34,34 @@ object Prefs {
         mPrefs = PreferenceManager.getDefaultSharedPreferences(ctx)
     }
 
-    @get:JvmName("getCloudAPIToken")
-    @set:JvmName("setCloudAPIToken")
-    var cloudApiToken: String?
-        get() = mPrefs.getString("cloud_api_token", null)
-        set(value) {
-            val e = mPrefs.edit()
-            if (value == null) e.remove("cloud_api_token")
-            else e.putString("cloud_api_token", value)
-            e.apply()
+    var webFrontend: String
+        get() {
+            val legacyMainsail = mPrefs.contains("mainsail")
+            return if (legacyMainsail) {
+                if (mPrefs.getBoolean("mainsail", true)) FRONTEND_MAINSAIL else FRONTEND_FLUIDD
+            } else {
+                mPrefs.getString("web_frontend", FRONTEND_MAINSAIL) ?: FRONTEND_MAINSAIL
+            }
         }
-
-    var cloudCachedUserFeatures: String?
-        get() = mPrefs.getString("cloud_cached_user_features", null)
         set(value) {
-            val e = mPrefs.edit()
-            if (value == null) e.remove("cloud_cached_user_features")
-            else e.putString("cloud_cached_user_features", value)
-            e.apply()
-        }
-
-    var cloudCachedUserInfo: String?
-        get() = mPrefs.getString("cloud_cached_user_info", null)
-        set(value) {
-            val e = mPrefs.edit()
-            if (value == null) e.remove("cloud_cached_user_info")
-            else e.putString("cloud_cached_user_info", value)
-            e.apply()
-        }
-
-    var cloudLastFeaturesSync: Long
-        get() = mPrefs.getLong("cloud_last_features_sync", 0)
-        set(value) { mPrefs.edit().putLong("cloud_last_features_sync", value).apply() }
-
-    var cloudLastSync: Long
-        get() = mPrefs.getLong("cloud_last_sync", 0)
-        set(value) { mPrefs.edit().putLong("cloud_last_sync", value).apply() }
-
-    var cloudLocalLastSentModified: Long
-        get() = mPrefs.getLong("cloud_local_last_sent_modified", 0)
-        set(value) { mPrefs.edit().putLong("cloud_local_last_sent_modified", value).apply() }
-
-    var cloudLocalLastModified: Long
-        get() = mPrefs.getLong("cloud_local_last_modified", 0)
-        set(value) { mPrefs.edit().putLong("cloud_local_last_modified", value).apply() }
-
-    var cloudRemoteLastModified: Long
-        get() = mPrefs.getLong("cloud_remote_last_modified", 0)
-        set(value) { mPrefs.edit().putLong("cloud_remote_last_modified", value).apply() }
-
-    var beamServerData: String
-        get() = mPrefs.getString("beam_server_data", "{}")!!
-        set(value) { mPrefs.edit().putString("beam_server_data", value).apply() }
-
-    var isRussianIP: Boolean
-        get() = mPrefs.getBoolean("russian_ip", false)
-        set(value) { mPrefs.edit().putBoolean("russian_ip", value).apply() }
-
-    var isMainsailEnabled: Boolean
-        get() = mPrefs.getBoolean("mainsail", true)
-        set(value) {
-            mPrefs.edit().putBoolean("mainsail", value).apply()
+            mPrefs.edit().putString("web_frontend", value).remove("mainsail").apply()
             KlipperApp.EVENT_BUS.fireEvent(WebFrontendChangedEvent())
+        }
+
+    var engine: String
+        get() = mPrefs.getString("engine", ENGINE_KLIPPER) ?: ENGINE_KLIPPER
+        set(value) {
+            mPrefs.edit().putString("engine", value).apply()
+            KlipperApp.EVENT_BUS.fireEvent(EngineChangedEvent())
+        }
+
+    val engineKey: String
+        get() = engine
+
+    var appLanguage: String
+        get() = mPrefs.getString("app_language", LANGUAGE_SYSTEM) ?: LANGUAGE_SYSTEM
+        set(value) {
+            mPrefs.edit().putString("app_language", value).apply()
         }
 
     val cameraWidth: Int
@@ -126,9 +104,12 @@ object Prefs {
         mPrefs.edit().putString("last_commit", BuildConfig.COMMIT).apply()
     }
 
-    fun getLastCheckedInfo(): Long = mPrefs.getLong("last_checked_info", 0)
-
-    fun setLastCheckedInfo() {
-        mPrefs.edit().putLong("last_checked_info", System.currentTimeMillis()).apply()
+    fun applyAppLanguage() {
+        val locales = if (appLanguage == LANGUAGE_SYSTEM) {
+            LocaleListCompat.getEmptyLocaleList()
+        } else {
+            LocaleListCompat.forLanguageTags(appLanguage)
+        }
+        AppCompatDelegate.setApplicationLocales(locales)
     }
 }

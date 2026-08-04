@@ -7,19 +7,11 @@ import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
 import java.io.File
-import java.io.IOException
-import android.os.Handler
-import android.os.Looper
 import androidx.multidex.MultiDexApplication
-import org.json.JSONObject
-import ru.ytkab0bp.beamklipper.cloud.AndroidPlatform
-import ru.ytkab0bp.beamklipper.cloud.CloudController
 import ru.ytkab0bp.beamklipper.db.BeamDB
 import ru.ytkab0bp.beamklipper.serial.UsbSerialManager
 import ru.ytkab0bp.beamklipper.utils.Prefs
-import ru.ytkab0bp.beamklipper.utils.ViewUtils
 import ru.ytkab0bp.eventbus.EventBus
-import ru.ytkab0bp.remotebeamlib.RemoteBeam
 
 class KlipperApp : MultiDexApplication() {
     override fun attachBaseContext(base: Context) {
@@ -84,30 +76,14 @@ class KlipperApp : MultiDexApplication() {
         DATABASE = BeamDB(this)
         KlipperInstance.onInstancesLoadedFromDB(DATABASE.getInstances())
         EventBus.registerImpl(this)
+        Prefs.applyAppLanguage()
         BundleInstaller.init(this)
-        RemoteBeam.init(AndroidPlatform)
-        CloudController.initCached()
-        Handler(Looper.getMainLooper()).post {
-            try {
-                CloudController.init()
-            } catch (e: NoClassDefFoundError) {
-                android.util.Log.w("KlipperApp", "Cloud API not available (secondary DEX not loaded)", e)
-            }
-        }
 
         hasUpdateInfo = try {
             assets.open("update.json").close()
             true
         } catch (_: java.io.IOException) {
             false
-        }
-        try {
-            BeamServerData.SERVER_DATA = BeamServerData.ServerData(JSONObject(Prefs.beamServerData))
-        } catch (e: org.json.JSONException) {
-            throw RuntimeException(e)
-        }
-        if (System.currentTimeMillis() - Prefs.getLastCheckedInfo() >= 86400000L) {
-            ViewUtils.postOnMainThread { BeamServerData.load() }
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

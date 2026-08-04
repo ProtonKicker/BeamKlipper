@@ -9,6 +9,7 @@ import android.util.Log
 import ru.ytkab0bp.beamklipper.BundleInstaller
 import ru.ytkab0bp.beamklipper.KlipperApp
 import ru.ytkab0bp.beamklipper.R
+import ru.ytkab0bp.beamklipper.utils.Prefs
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
@@ -98,7 +99,18 @@ open class BaseKlippyService(private val num: Int) : BasePythonService() {
             } catch (e: Exception) {
                 Log.w("klippy_$num", "Failed to read/parse printer.cfg", e)
             }
-            runPython(File(KlipperApp.INSTANCE.filesDir, "klipper/klippy"), "klippy", "klippy.py", "-B", virtualInput.absolutePath, "-l", logs.absolutePath, "-a", socket.absolutePath, printerCfg.absolutePath)
+            runPython(
+                File(KlipperApp.INSTANCE.filesDir, "${Prefs.engineKey}/klippy"),
+                "klippy",
+                "klippy.py",
+                "-B",
+                virtualInput.absolutePath,
+                "-l",
+                logs.absolutePath,
+                "-a",
+                socket.absolutePath,
+                printerCfg.absolutePath
+            )
         } catch (e: Exception) {
             Log.e("klippy_$num", "Failed to start klippy", e)
         }

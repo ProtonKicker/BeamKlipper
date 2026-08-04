@@ -47,7 +47,7 @@ android {
         python {
             version = "3.10"
             pip {
-                options("--extra-index-url", "https://beam3d.ru/pypi", "--find-links", "file://" + project.projectDir.toString() + "/python_wheels")
+                options("--find-links", "file://" + project.projectDir.toString() + "/python_wheels")
 
                 install "cffi==1.15.1"
                 install "pyserial==3.5"
@@ -148,11 +148,8 @@ dependencies {
     implementation 'com.squareup.okhttp3:okhttp:3.14.9'
     implementation 'com.google.code.gson:gson:2.13.1'
     implementation 'androidx.multidex:multidex:2.0.1'
-    implementation 'com.loopj.android:android-async-http:1.4.11'
     implementation 'com.github.androidmads:QRGenerator:1.0.5'
 
-    implementation project(":remotebeamlib")
-    implementation project(":sapil")
     implementation project(":eventbus")
     implementation project(":eventbus_api")
     kapt project(":eventbus_processor")
@@ -285,14 +282,64 @@ tasks.register('bundleMainsail') {
     }
 }
 
+tasks.register('bundleKalicoFrontend') {
+    doFirst {
+        var assets = file('src/main/assets')
+        var versionFile = new File(assets, 'kalico_frontend_version')
+        var configVersion = project.property('beam.mainsail_version')
+
+        if (versionFile.exists() && configVersion == versionFile.text.trim()) {
+            return
+        }
+
+        var kalicoDir = new File(assets, 'kalico_frontend')
+        var files = new ArrayList<File>()
+        collectFiles(kalicoDir, files)
+        files.each {
+            it.delete()
+        }
+
+        def con = new URL('https://github.com/mainsail-crew/mainsail/releases/download/' + configVersion + '/mainsail.zip').openConnection() as HttpURLConnection
+        if (con.getResponseCode() == 200) {
+            ZipInputStream zis = new ZipInputStream(con.getInputStream())
+            ZipEntry entry
+            byte[] buf = new byte[10240]
+            int c
+
+            while (entry = zis.getNextEntry()) {
+                File f = new File(kalicoDir, entry.getName())
+                if (entry.isDirectory()) {
+                    f.mkdirs()
+                    continue
+                }
+
+                f.getParentFile().mkdirs()
+                var fos = new FileOutputStream(f)
+
+                while ((c = zis.read(buf)) != -1) {
+                    fos.write(buf, 0, c)
+                }
+                fos.close()
+            }
+            zis.close()
+
+            versionFile.text = configVersion
+        } else {
+            throw new IllegalStateException('Failed to download Kalico frontend bundle')
+        }
+    }
+}
+
 tasks.register('bundleKlipper') {
     doFirst {
         var assets = file('src/main/assets')
         var versionFile = new File(assets, 'bundle_version')
-        var version = 'klipper-' + getGitCommitHash(file('src/main/klipper')) + '_moonraker-' + getGitCommitHash(file('src/main/moonraker')) + '_happyhare-' + getGitCommitHash(file('src/main/happyhare')) + '_klipper_tmc_autotune-' + getGitCommitHash(file('src/main/klipper_tmc_autotune')) + '_moonraker_timelapse-' + getGitCommitHash(file('src/main/moonraker_timelapse')) + '_beamext-' + file('src/main/assets/klipper/beam_ext/ext_version').text
+        var kalicoHash = file('src/main/kalico').exists() ? getGitCommitHash(file('src/main/kalico')) : 'none'
+        var version = 'klipper-' + getGitCommitHash(file('src/main/klipper')) + '_kalico-' + kalicoHash + '_moonraker-' + getGitCommitHash(file('src/main/moonraker')) + '_happyhare-' + getGitCommitHash(file('src/main/happyhare')) + '_klipper_tmc_autotune-' + getGitCommitHash(file('src/main/klipper_tmc_autotune')) + '_moonraker_timelapse-' + getGitCommitHash(file('src/main/moonraker_timelapse')) + '_beamext-' + file('src/main/assets/klipper/beam_ext/ext_version').text
         if (!versionFile.exists() || versionFile.text != version) {
             var files = new ArrayList<File>()
             collectFiles(file('src/main/assets/klipper/klippy'), files)
+            collectFiles(file('src/main/assets/kalico/klippy'), files)
             collectFiles(file('src/main/assets/moonraker/moonraker'), files)
             files.each {
                 it.delete()
@@ -379,6 +426,65 @@ tasks.register('bundleKlipper') {
             JSONObject index = new JSONObject()
             index.put('klipper', arr)
 
+            if (file('src/main/kalico/klippy').exists()) {
+                arr = new JSONArray()
+                klippy = file('src/main/kalico/klippy')
+                files.clear()
+                collectFiles(klippy, files)
+                files.each {
+                    var sub = it.getAbsolutePath().substring(klippy.getAbsolutePath().length() + 1).replace('\\', '/')
+                    if (sub.startsWith(".") || sub.contains("/.")) return
+                    arr.put('klippy/' + sub)
+                    var f = new File(assets, 'kalico/klippy/' + sub)
+                    f.getParentFile().mkdirs()
+                    Files.copy(it.toPath(), f.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                }
+
+                files.clear()
+                klippy = file('src/main/happyhare/extras')
+                collectFiles(klippy, files)
+                files.each {
+                    if (it.getName() == ".pylintrc") return
+
+                    var sub = it.getAbsolutePath().substring(klippy.getAbsolutePath().length() + 1).replace('\\', '/')
+                    if (sub.startsWith(".") || sub.contains("/.")) return
+                    arr.put('klippy/extras/' + sub)
+                    var f = new File(assets, 'kalico/klippy/extras/' + sub)
+                    f.getParentFile().mkdirs()
+                    Files.copy(it.toPath(), f.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                }
+
+                files.clear()
+                klippy = file('src/main/klipper_tmc_autotune')
+                collectFiles(klippy, files)
+                files.each {
+                    if (!it.getName().endsWith(".py") && !it.getName().endsWith(".cfg")) return
+
+                    var sub = it.getAbsolutePath().substring(klippy.getAbsolutePath().length() + 1).replace('\\', '/')
+                    if (sub.startsWith(".") || sub.contains("/.")) return
+                    arr.put('klippy/extras/' + sub)
+                    var f = new File(assets, 'kalico/klippy/extras/' + sub)
+                    f.getParentFile().mkdirs()
+                    Files.copy(it.toPath(), f.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                }
+
+                files.clear()
+                klippy = file('src/main/assets/klipper/beam_ext')
+                collectFiles(klippy, files)
+                files.each {
+                    if (it.getName() == "ext_version") return
+
+                    var sub = it.getAbsolutePath().substring(klippy.getAbsolutePath().length() + 1).replace('\\', '/')
+                    if (sub.startsWith(".") || sub.contains("/.")) return
+                    arr.put('klippy/extras/' + sub)
+                    var f = new File(assets, 'kalico/klippy/extras/' + sub)
+                    f.getParentFile().mkdirs()
+                    Files.copy(it.toPath(), f.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                }
+
+                index.put('kalico', arr)
+            }
+
             arr = new JSONArray()
             arr.put('bootstrap.py')
             var moonraker = file('src/main/moonraker/moonraker')
@@ -423,3 +529,4 @@ tasks.register('bundleKlipper') {
 tasks.getByName('preBuild').dependsOn('bundleKlipper')
 tasks.getByName('preBuild').dependsOn('bundleFluidd')
 tasks.getByName('preBuild').dependsOn('bundleMainsail')
+tasks.getByName('preBuild').dependsOn('bundleKalicoFrontend')

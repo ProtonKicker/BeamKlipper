@@ -165,7 +165,7 @@ class WebService : Service() {
                     resolvedPath.endsWith(".css") -> "text/css"
                     else -> "text/plain"
                 }
-                val prefix = if (Prefs.isMainsailEnabled) "mainsail" else "fluidd"
+                val prefix = Prefs.webFrontend
                 val input = ctx.assets.open(prefix + resolvedPath)
                 val response = Response.newChunkedResponse(Status.OK, mimeType, input)
                 response.addHeader("Date", dateFormat.format(Date()))
@@ -173,7 +173,7 @@ class WebService : Service() {
                 response.addHeader("Cache-Control", "max-age=604800")
                 return response
             } catch (e: IOException) {
-                if (Prefs.isMainsailEnabled) return serveStatic("/index.html")
+                if (Prefs.webFrontend != Prefs.FRONTEND_FLUIDD) return serveStatic("/index.html")
                 return Response.newFixedLengthResponse(Status.NOT_FOUND, "text/plain", "Not Found")
             }
         }

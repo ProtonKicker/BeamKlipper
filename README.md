@@ -1,12 +1,6 @@
-# Beam Klipper - Klipper for vanilla Android!
+# Beam Klipper - Klipper for Android
 
 Beam Klipper allows you to run [Klipper](https://github.com/KevinOConnor/klipper) host software (Klippy) on any Android 5.0+ device with OTG support.
-
-Telegram: https://t.me/ytkab0bp_channel
-
-Boosty (Patreon alternative): https://boosty.to/ytkab0bp
-
-K3D Chat for discussion & support (Russian language only): https://t.me/K_3_D
 
 # Quick start
 
@@ -48,7 +42,7 @@ Beam Klipper bundles:
 - [Klipper TMC Autotune](https://github.com/andrewmcgr/klipper_tmc_autotune)
 - [Moonraker-timelapse](https://github.com/mainsail-crew/moonraker-timelapse)
 
-# Beam extensions
+# Android extensions
 
 Beam Klipper provides additional extensions to control some built-in features.
 

@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -22,6 +23,7 @@ import android.view.Window
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -30,14 +32,11 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import ru.ytkab0bp.beamklipper.*
-import ru.ytkab0bp.beamklipper.cloud.CloudController
-import ru.ytkab0bp.beamklipper.events.CloudLoginStateUpdatedEvent
 import ru.ytkab0bp.beamklipper.serial.KlipperProbeTable
 import ru.ytkab0bp.beamklipper.serial.UsbSerialManager
 import ru.ytkab0bp.beamklipper.utils.Prefs
 import ru.ytkab0bp.beamklipper.utils.ViewUtils
 import ru.ytkab0bp.beamklipper.view.preferences.*
-import ru.ytkab0bp.eventbus.EventHandler
 import java.io.File
 
 class PreferencesCardView(context: Context) : FrameLayout(context) {
@@ -60,11 +59,11 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
     private lateinit var adapter: RecyclerView.Adapter<RecyclerView.ViewHolder>
 
     private var itemsCount = 0
-    private var accountHeaderRow = 0
-    private var accountStatusRow = 0
     private var generalHeaderRow = 0
     private var systemSettingsRow = 0
     private var frontendRow = 0
+    private var firmwareRow = 0
+    private var languageRow = 0
     private var cameraHeaderRow = 0
     private var cameraEnabledRow = 0
     private var usbHeaderRow = 0
@@ -140,7 +139,6 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
                                 cameraHeaderRow -> R.string.Camera
                                 usbHeaderRow -> R.string.USB
                                 generalHeaderRow -> R.string.General
-                                accountHeaderRow -> R.string.SettingsCloudManageTitle
                                 otherHeaderRow -> R.string.Other
                                 else -> 0
                             }
@@ -189,21 +187,6 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
                                     b.setPositiveButton(android.R.string.ok, null).show()
                                 }
                             }
-                            accountStatusRow -> {
-                                if (Prefs.cloudApiToken == null) {
-                                    pref.bind(context.getString(R.string.SettingsCloudNotLoggedIn), context.getString(R.string.SettingsCloudTapToShowMore))
-                                } else {
-                                    if (CloudController.getUserInfo() == null) {
-                                        pref.bind(context.getString(R.string.SettingsCloudLoading), null)
-                                    } else {
-                                        val info = CloudController.getUserInfo() ?: return
-                                    pref.bind(info.displayName, context.getString(R.string.SettingsCloudTapToManage))
-                                    }
-                                }
-                                pref.setOnClickListener {
-                                    it.context.startActivity(Intent(it.context, CloudActivity::class.java))
-                                }
-                            }
                             systemSettingsRow -> {
                                 pref.bind(context.getString(R.string.SystemSettings), null)
                                 pref.setOnClickListener {
@@ -245,20 +228,91 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
                             frontendRow -> {
                                 v.bind(
                                     KlipperApp.INSTANCE.getString(R.string.WebFrontend),
-                                    KlipperApp.INSTANCE.getString(
-                                        if (Prefs.isMainsailEnabled) R.string.Mainsail else R.string.Fluidd
-                                    )
+                                    frontendTitle(Prefs.webFrontend)
                                 )
                                 v.setOnClickListener {
                                     MaterialAlertDialogBuilder(it.context)
                                         .setTitle(R.string.WebFrontend)
                                         .setItems(arrayOf(
                                             KlipperApp.INSTANCE.getString(R.string.Fluidd),
-                                            KlipperApp.INSTANCE.getString(R.string.Mainsail)
+                                            KlipperApp.INSTANCE.getString(R.string.Mainsail),
+                                            KlipperApp.INSTANCE.getString(R.string.Kalico)
                                         ), DialogInterface.OnClickListener { dialog, which ->
-                                            Prefs.isMainsailEnabled = which == 1
+                                            Prefs.webFrontend = when (which) {
+                                                0 -> Prefs.FRONTEND_FLUIDD
+                                                1 -> Prefs.FRONTEND_MAINSAIL
+                                                else -> Prefs.FRONTEND_KALICO
+                                            }
                                             adapter.notifyItemChanged(holder.adapterPosition)
                                         })
+                                        .show()
+                                }
+                            }
+                            firmwareRow -> {
+                                v.bind(
+                                    KlipperApp.INSTANCE.getString(R.string.FirmwareEngine),
+                                    firmwareTitle(Prefs.engine)
+                                )
+                                v.setOnClickListener {
+                                    MaterialAlertDialogBuilder(it.context)
+                                        .setTitle(R.string.FirmwareEngine)
+                                        .setItems(
+                                            arrayOf(
+                                                KlipperApp.INSTANCE.getString(R.string.Klipper),
+                                                KlipperApp.INSTANCE.getString(R.string.Kalico)
+                                            )
+                                        ) { _, which ->
+                                            val engine = if (which == 0) Prefs.ENGINE_KLIPPER else Prefs.ENGINE_KALICO
+                                            if (engine == Prefs.ENGINE_KALICO &&
+                                                !File(KlipperApp.INSTANCE.filesDir, "kalico/klippy/klippy.py").exists()
+                                            ) {
+                                                MaterialAlertDialogBuilder(it.context)
+                                                    .setTitle(R.string.Error)
+                                                    .setMessage(R.string.EngineNotBundled)
+                                                    .setPositiveButton(android.R.string.ok, null)
+                                                    .show()
+                                                return@setItems
+                                            }
+
+                                            Prefs.engine = engine
+                                            adapter.notifyItemChanged(holder.adapterPosition)
+                                            if (KlipperInstance.getInstances().any { inst -> inst.getState() == KlipperInstance.State.RUNNING }) {
+                                                MaterialAlertDialogBuilder(it.context)
+                                                    .setTitle(R.string.FirmwareEngine)
+                                                    .setMessage(R.string.EngineRestartRequired)
+                                                    .setPositiveButton(android.R.string.ok, null)
+                                                    .show()
+                                            }
+                                        }
+                                        .show()
+                                }
+                            }
+                            languageRow -> {
+                                v.bind(
+                                    KlipperApp.INSTANCE.getString(R.string.AppLanguage),
+                                    languageTitle(Prefs.appLanguage)
+                                )
+                                v.setOnClickListener {
+                                    MaterialAlertDialogBuilder(it.context)
+                                        .setTitle(R.string.AppLanguage)
+                                        .setItems(
+                                            arrayOf(
+                                                KlipperApp.INSTANCE.getString(R.string.LanguageSystem),
+                                                KlipperApp.INSTANCE.getString(R.string.LanguageEnglish),
+                                                KlipperApp.INSTANCE.getString(R.string.LanguageChineseSimplified),
+                                                KlipperApp.INSTANCE.getString(R.string.LanguageChineseTraditional)
+                                            )
+                                        ) { _, which ->
+                                            Prefs.appLanguage = when (which) {
+                                                0 -> Prefs.LANGUAGE_SYSTEM
+                                                1 -> Prefs.LANGUAGE_ENGLISH
+                                                2 -> Prefs.LANGUAGE_CHINESE_SIMPLIFIED
+                                                else -> Prefs.LANGUAGE_CHINESE_TRADITIONAL
+                                            }
+                                            Prefs.applyAppLanguage()
+                                            adapter.notifyItemChanged(holder.adapterPosition)
+                                            (it.context as? AppCompatActivity)?.recreate()
+                                        }
                                         .show()
                                 }
                             }
@@ -272,9 +326,9 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
             override fun getItemViewType(position: Int): Int {
                 return when (position) {
                     cameraEnabledRow -> VIEW_TYPE_SWITCH
-                    cameraHeaderRow, usbHeaderRow, generalHeaderRow, accountHeaderRow, otherHeaderRow -> VIEW_TYPE_HEADER
-                    listUsbRow, accountStatusRow, systemSettingsRow, getMCUFirmwareRow -> VIEW_TYPE_PREFERENCE
-                    usbNamingRow, frontendRow -> VIEW_TYPE_PREF_VALUE
+                    cameraHeaderRow, usbHeaderRow, generalHeaderRow, otherHeaderRow -> VIEW_TYPE_HEADER
+                    listUsbRow, systemSettingsRow, getMCUFirmwareRow -> VIEW_TYPE_PREFERENCE
+                    usbNamingRow, frontendRow, firmwareRow, languageRow -> VIEW_TYPE_PREF_VALUE
                     else -> 0
                 }
             }
@@ -297,25 +351,13 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
         KlipperApp.EVENT_BUS.unregisterListener(this)
     }
 
-    @EventHandler(runOnMainThread = true)
-    fun onCloudAuthStateUpdated(e: CloudLoginStateUpdatedEvent) {
-        if (BeamServerData.isCloudAvailable()) {
-            adapter.notifyItemChanged(accountStatusRow)
-        }
-    }
-
     private fun updateRows() {
         itemsCount = 0
-        if (BeamServerData.isCloudAvailable()) {
-            accountHeaderRow = itemsCount++
-            accountStatusRow = itemsCount++
-        } else {
-            accountHeaderRow = -1
-            accountStatusRow = -1
-        }
         generalHeaderRow = itemsCount++
         systemSettingsRow = if (context is MainActivity && (context as MainActivity).isCurrentLauncher()) itemsCount++ else -1
         frontendRow = itemsCount++
+        firmwareRow = itemsCount++
+        languageRow = itemsCount++
         cameraHeaderRow = itemsCount++
         cameraEnabledRow = itemsCount++
         usbHeaderRow = itemsCount++
@@ -323,6 +365,32 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
         listUsbRow = itemsCount++
         otherHeaderRow = itemsCount++
         getMCUFirmwareRow = itemsCount++
+    }
+
+    private fun frontendTitle(frontend: String): String {
+        val resId = when (frontend) {
+            Prefs.FRONTEND_FLUIDD -> R.string.Fluidd
+            Prefs.FRONTEND_KALICO -> R.string.Kalico
+            else -> R.string.Mainsail
+        }
+        return KlipperApp.INSTANCE.getString(resId)
+    }
+
+    private fun firmwareTitle(engine: String): String {
+        return KlipperApp.INSTANCE.getString(
+            if (engine == Prefs.ENGINE_KALICO) R.string.Kalico else R.string.Klipper
+        )
+    }
+
+    private fun languageTitle(language: String): String {
+        return KlipperApp.INSTANCE.getString(
+            when (language) {
+                Prefs.LANGUAGE_ENGLISH -> R.string.LanguageEnglish
+                Prefs.LANGUAGE_CHINESE_SIMPLIFIED -> R.string.LanguageChineseSimplified
+                Prefs.LANGUAGE_CHINESE_TRADITIONAL -> R.string.LanguageChineseTraditional
+                else -> R.string.LanguageSystem
+            }
+        )
     }
 
     override fun draw(canvas: Canvas) {

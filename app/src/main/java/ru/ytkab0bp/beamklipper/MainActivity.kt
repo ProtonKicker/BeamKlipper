@@ -42,21 +42,15 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.hoho.android.usbserial.driver.UsbSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialProber
-import ru.ytkab0bp.beamklipper.cloud.CloudAPI
-import ru.ytkab0bp.beamklipper.cloud.CloudController
 import ru.ytkab0bp.beamklipper.events.*
 import ru.ytkab0bp.beamklipper.serial.KlipperProbeTable
 import ru.ytkab0bp.beamklipper.serial.UsbSerialManager
-import ru.ytkab0bp.beamklipper.utils.LogUploader
 import ru.ytkab0bp.beamklipper.utils.Prefs
 import ru.ytkab0bp.beamklipper.utils.ViewUtils
 import ru.ytkab0bp.beamklipper.view.*
 import ru.ytkab0bp.beamklipper.view.preferences.PreferenceSwitchView
-import ru.ytkab0bp.beamklipper.view.preferences.PreferenceView
 import ru.ytkab0bp.eventbus.EventHandler
-import ru.ytkab0bp.sapil.APICallback
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -82,14 +76,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var newOrEditLayout: LinearLayout
     private lateinit var newOrEditTitle: TextView
     private var editInstance: KlipperInstance? = null
-    private var pendingRemotePrinter: CloudAPI.RemotePrinter? = null
     private lateinit var nameRow: EditTextRowView
     private lateinit var configRow: EditTextRowView
     private lateinit var editOpenDirectoryRow: TextView
-    private lateinit var editUploadLogsRow: TextView
     private lateinit var autostartRow: PreferenceSwitchView
-    private lateinit var remoteRow: PreferenceSwitchView
-    private lateinit var remoteCopyRow: PreferenceView
     private lateinit var newOrEditContinue: TextView
 
     private lateinit var preferencesView: PreferencesCardView
@@ -107,7 +97,6 @@ class MainActivity : AppCompatActivity() {
 
     private var isTV = false
     private var isCurrentLauncher = false
-    private var isRequestingRemoteToken = false
 
     @SuppressLint("BatteryLife", "InlinedApi")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -286,10 +275,6 @@ class MainActivity : AppCompatActivity() {
                             newOrEditTitle.setText(R.string.EditInstance)
                             editInstance = inst
                             editOpenDirectoryRow.visibility = View.VISIBLE
-                            editUploadLogsRow.visibility = View.VISIBLE
-                            remoteRow.visibility = if (BeamServerData.isCloudAvailable()) View.VISIBLE else View.GONE
-                            remoteRow.bind(getString(R.string.BeamRemoteAccess), null, inst.remoteToken != null)
-                            remoteCopyRow.visibility = if (BeamServerData.isCloudAvailable() && inst.remoteToken != null) View.VISIBLE else View.GONE
                             autostartRow.bind(getString(R.string.Autostart), null, inst.autostart)
                             nameRow.bind(R.string.InstanceName, inst.name)
                             configRow.visibility = View.GONE
@@ -316,9 +301,6 @@ class MainActivity : AppCompatActivity() {
                             newOrEditTitle.setText(R.string.NewInstance)
                             editInstance = null
                             editOpenDirectoryRow.visibility = View.GONE
-                            editUploadLogsRow.visibility = View.GONE
-                            remoteRow.visibility = View.GONE
-                            remoteCopyRow.visibility = View.GONE
                             autostartRow.bind(getString(R.string.Autostart), null, false)
                             nameRow.bind(R.string.InstanceName, null)
                             configRow.apply {
@@ -439,142 +421,11 @@ class MainActivity : AppCompatActivity() {
         }
         newOrEditLayout.addView(editOpenDirectoryRow)
 
-        editUploadLogsRow = TextView(this@MainActivity).apply {
-            setText(R.string.UploadLogs)
-            setTextColor(ViewUtils.resolveColor(this@MainActivity, android.R.attr.textColorPrimary))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-            gravity = Gravity.START or Gravity.CENTER_VERTICAL
-            setPadding(ViewUtils.dp(21), 0, ViewUtils.dp(21), 0)
-            background = ViewUtils.resolveDrawable(this@MainActivity, android.R.attr.selectableItemBackground)
-            layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(52))
-            setOnClickListener { LogUploader.uploadLogs(editInstance!!) }
-        }
-        newOrEditLayout.addView(editUploadLogsRow)
-
         autostartRow = PreferenceSwitchView(this@MainActivity).apply {
             layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(52))
             setOnClickListener { isChecked = !isChecked }
         }
         newOrEditLayout.addView(autostartRow)
-
-        remoteRow = PreferenceSwitchView(this@MainActivity).apply {
-            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(52))
-            setOnClickListener {
-                if (isRequestingRemoteToken) return@setOnClickListener
-                val features = CloudController.getUserFeatures()
-                val userInfo = CloudController.getUserInfo()
-                if (Prefs.cloudApiToken == null ||
-                    features != null &&
-                    features.remoteAccessLevel != -1 &&
-                    userInfo != null &&
-                    userInfo.currentLevel < features.remoteAccessLevel
-                ) {
-                    startActivity(Intent(this@MainActivity, CloudActivity::class.java))
-                } else if (userInfo == null) {
-                    Toast.makeText(this@MainActivity, R.string.BeamRemoteAccessStillLoading, Toast.LENGTH_SHORT).show()
-                } else {
-                    if (editInstance!!.remoteId != null) {
-                        pendingRemotePrinter = null
-                        isChecked = false
-                        CloudAPI.INSTANCE.remoteDeletePrinter(editInstance!!.remoteId!!) {}
-                        editInstance!!.remoteId = null
-                        editInstance!!.remoteToken = null
-                        remoteCopyRow.visibility = View.GONE
-                        return@setOnClickListener
-                    }
-
-                    isRequestingRemoteToken = true
-                    CloudAPI.INSTANCE.remoteGetPrinters(object : APICallback<List<CloudAPI.RemotePrinter>> {
-                        override fun onResponse(response: List<CloudAPI.RemotePrinter>) {
-                            val respFeatures = CloudController.getUserFeatures() ?: return
-                            if (response.size >= respFeatures.remoteAccessPrintersLimit) {
-                                isRequestingRemoteToken = false
-                                ViewUtils.postOnMainThread {
-                                    val items = response.map { it.name as CharSequence }.toTypedArray()
-                                    MaterialAlertDialogBuilder(this@MainActivity)
-                                        .setTitle(R.string.BeamRemoteAccessTooManyPrinters)
-                                        .setItems(items) { _, which ->
-                                            CloudAPI.INSTANCE.remoteDeletePrinter(response[which].id, object : APICallback<Boolean> {
-                                                override fun onResponse(response: Boolean) {
-                                                    isRequestingRemoteToken = false
-                                                    ViewUtils.postOnMainThread { remoteRow.callOnClick() }
-                                                }
-
-                                                override fun onException(e: Exception) {
-                                                    isRequestingRemoteToken = false
-                                                    Log.e("remote", "Failed to delete printer", e)
-                                                    ViewUtils.postOnMainThread { Toast.makeText(this@MainActivity, R.string.ErrorTryLater, Toast.LENGTH_SHORT).show() }
-                                                }
-                                            })
-                                        }
-                                        .setPositiveButton(R.string.Cancel, null)
-                                        .show()
-                                }
-                            } else {
-                                val curInstance = editInstance
-                                if (curInstance == null) {
-                                    isRequestingRemoteToken = false
-                                    return
-                                }
-                                CloudAPI.INSTANCE.remoteCreatePrinter(curInstance.name, object : APICallback<CloudAPI.RemotePrinter> {
-                                    override fun onResponse(response: CloudAPI.RemotePrinter) {
-                                        curInstance.remoteId = response.id
-                                        curInstance.remoteToken = response.token
-                                        pendingRemotePrinter = response
-                                        ViewUtils.postOnMainThread {
-                                            isChecked = true
-                                            remoteCopyRow.visibility = View.VISIBLE
-                                            isRequestingRemoteToken = false
-                                        }
-                                    }
-
-                                    override fun onException(e: Exception) {
-                                        isRequestingRemoteToken = false
-                                        Log.e("remote", "Failed to create printer", e)
-                                        ViewUtils.postOnMainThread { Toast.makeText(this@MainActivity, R.string.ErrorTryLater, Toast.LENGTH_SHORT).show() }
-                                    }
-                                })
-                            }
-                        }
-
-                        override fun onException(e: Exception) {
-                            isRequestingRemoteToken = false
-                            Log.e("remote", "Failed to get printers", e)
-                            ViewUtils.postOnMainThread { Toast.makeText(this@MainActivity, R.string.ErrorTryLater, Toast.LENGTH_SHORT).show() }
-                        }
-                    })
-                }
-            }
-        }
-        newOrEditLayout.addView(remoteRow)
-
-        remoteCopyRow = PreferenceView(this@MainActivity).apply {
-            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(52))
-            bind(getString(R.string.BeamRemoteAccessShowPublicLink), null)
-            setOnClickListener {
-                if (isRequestingRemoteToken) return@setOnClickListener
-                isRequestingRemoteToken = true
-                CloudAPI.INSTANCE.remoteGetPrinters(object : APICallback<List<CloudAPI.RemotePrinter>> {
-                    override fun onResponse(response: List<CloudAPI.RemotePrinter>) {
-                        isRequestingRemoteToken = false
-                        val instance = editInstance ?: return
-                        for (printer in response) {
-                            if (printer.id == instance.remoteId) {
-                                ViewUtils.postOnMainThread { QRCodeAlertDialog(this@MainActivity, printer.publicUrl).show() }
-                                break
-                            }
-                        }
-                    }
-
-                    override fun onException(e: Exception) {
-                        isRequestingRemoteToken = false
-                        Log.e("remote", "Failed to get printers", e)
-                        ViewUtils.postOnMainThread { Toast.makeText(this@MainActivity, R.string.ErrorTryLater, Toast.LENGTH_SHORT).show() }
-                    }
-                })
-            }
-        }
-        newOrEditLayout.addView(remoteCopyRow)
 
         newOrEditContinue = TextView(this@MainActivity).apply {
             setTextColor(ViewUtils.resolveColor(this@MainActivity, android.R.attr.textColorPrimary))
@@ -599,7 +450,6 @@ class MainActivity : AppCompatActivity() {
                     editInstance!!.autostart = autostartRow.isChecked
                     KlipperApp.DATABASE.update(editInstance!!)
                     editInstance = null
-                    pendingRemotePrinter = null
                     animateNewOrEditLayout(false)
                     return@setOnClickListener
                 }
@@ -759,7 +609,6 @@ class MainActivity : AppCompatActivity() {
 
         if (Prefs.getLastCommit() != BuildConfig.COMMIT && KlipperApp.hasUpdateInfo) {
             Prefs.setLastCommit()
-            BeamServerData.load()
             ChangeLogBottomSheet(this@MainActivity).show()
         }
 
@@ -824,6 +673,7 @@ class MainActivity : AppCompatActivity() {
                 return true
             } else if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
                 if (focusInBadges) return super.onKeyDown(keyCode, event)
+                if (focusInList && refBadges.isEmpty()) return super.onKeyDown(keyCode, event)
 
                 val isFirst = if (focusInList) {
                     val focus = listView.findFocus()
@@ -848,49 +698,13 @@ class MainActivity : AppCompatActivity() {
         return super.onKeyDown(keyCode, event)
     }
 
-    @EventHandler(runOnMainThread = true)
-    fun onBeamDataUpdated(e: BeamServerDataUpdatedEvent) {
-        buildBadges()
-        invalidateHomeProgress(homeView.progress)
-    }
-
     private fun buildBadges() {
         for (refBadge in refBadges) {
-            badgesLayout.removeView(refBadge)
-        }
-        refBadges = arrayOfNulls<RefBadgeView>(if (BeamServerData.isBoostyAvailable()) 3 else 2)
-        var i = 0
-
-        if (BeamServerData.isBoostyAvailable()) {
-            refBadges[i] = RefBadgeView(this@MainActivity).apply {
-                setIcon(R.drawable.ic_boosty, R.attr.boostyColor, R.string.BadgeBoosty)
-                setOnClickListener { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://boosty.to/ytkab0bp"))) }
-                id = R.id.badge_boosty
-                nextFocusDownId = R.id.badge_telegram
+            if (refBadge != null) {
+                badgesLayout.removeView(refBadge)
             }
-            badgesLayout.addView(refBadges[i])
-            i++
         }
-
-        refBadges[i] = RefBadgeView(this@MainActivity).apply {
-            setIcon(R.drawable.ic_telegram, R.attr.telegramColor, R.string.BadgeTelegram)
-            icon.translationX = -ViewUtils.dp(1).toFloat()
-            setOnClickListener { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/ytkab0bp_channel"))) }
-            id = R.id.badge_telegram
-            nextFocusUpId = R.id.badge_boosty
-            nextFocusDownId = R.id.badge_k3d
-        }
-        badgesLayout.addView(refBadges[i])
-        i++
-
-        refBadges[i] = RefBadgeView(this@MainActivity).apply {
-            setIcon(R.drawable.k3d_logo_new_14, 0, R.string.BadgeK3D)
-            icon.setPadding(ViewUtils.dp(8), ViewUtils.dp(8), ViewUtils.dp(8), ViewUtils.dp(8))
-            setOnClickListener { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/K_3_D"))) }
-            id = R.id.badge_k3d
-            nextFocusUpId = R.id.badge_telegram
-        }
-        badgesLayout.addView(refBadges[i])
+        refBadges = emptyArray()
     }
 
     fun isCurrentLauncher(): Boolean = isCurrentLauncher
@@ -968,14 +782,7 @@ class MainActivity : AppCompatActivity() {
                     newOrEditLayout.visibility = View.GONE
                     resizeFrame.removeForceNotMeasure(newOrEditLayout)
                     listView.getChildAt(2 + (if (KlipperInstance.isWebServerRunning()) 1 else 0)).requestFocus()
-
-                    if (editInstance != null) {
-                        editInstance = null
-                        if (pendingRemotePrinter != null) {
-                            CloudAPI.INSTANCE.remoteDeletePrinter(pendingRemotePrinter?.id ?: return@addEndListener) {}
-                            pendingRemotePrinter = null
-                        }
-                    }
+                    editInstance = null
                 }
                 newOrEditAnimation = null
             }

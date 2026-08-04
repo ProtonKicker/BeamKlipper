@@ -19,3 +19,6 @@
 [submodule "SAPIL"]
 	path = SAPIL
 	url = https://utkabobr@github.com/utkabobr/SAPIL
+[submodule "app/src/main/kalico"]
+	path = app/src/main/kalico
+	url = https://github.com/KalicoCrew/kalico

@@ -20,6 +20,7 @@ object BundleInstaller {
             if (prefs.getString("version", "") != ver) {
                 val index = JSONObject(readString(assets, "index.json"))
                 unpack(assets, index, root, "klipper")
+                unpack(assets, index, root, "kalico")
                 unpack(assets, index, root, "moonraker")
                 prefs.edit().putString("version", ver).apply()
             }
@@ -27,33 +28,37 @@ object BundleInstaller {
             val nativeDir = File(info.applicationInfo!!.nativeLibraryDir)
             val lib = File(nativeDir, "libklippy_chelper.so")
 
-            var str = readString(assets, "klipper/klippy/chelper/__init__.py")
-            str = str.replace("\${DEST_LIB}", lib.absolutePath)
             if (prefs.getString("native_lib", "") != lib.absolutePath) {
-                FileOutputStream(File(root, "klipper/klippy/chelper/__init__.py")).use {
-                    it.write(str.toByteArray(Charsets.UTF_8))
+                patchBundledFile(root, assets, "klipper", "klippy/chelper/__init__.py") {
+                    it.replace("\${DEST_LIB}", lib.absolutePath)
+                }
+                patchBundledFile(root, assets, "kalico", "klippy/chelper/__init__.py") {
+                    it.replace("\${DEST_LIB}", lib.absolutePath)
                 }
                 prefs.edit().putString("native_lib", lib.absolutePath).apply()
             }
 
-            str = readString(assets, "moonraker/moonraker/utils/sysfs_devs.py")
+            var str = readString(assets, "moonraker/moonraker/utils/sysfs_devs.py")
             str = str.replace("TTY_PATH = \"/sys/class/tty\"",
                 "TTY_PATH = \"" + File(KlipperApp.INSTANCE.filesDir, "serial").absolutePath + "\"")
             FileOutputStream(File(root, "moonraker/moonraker/utils/sysfs_devs.py")).use {
                 it.write(str.toByteArray(Charsets.UTF_8))
             }
 
-            str = readString(assets, "klipper/klippy/extras/resonance_tester.py")
-            str = str.replace("\${TEMP_PATH}", File(KlipperApp.INSTANCE.cacheDir, "resonances").absolutePath)
-            FileOutputStream(File(root, "klipper/klippy/extras/resonance_tester.py")).use {
-                it.write(str.toByteArray(Charsets.UTF_8))
+            val tempPath = File(KlipperApp.INSTANCE.cacheDir, "resonances").absolutePath
+            patchBundledFile(root, assets, "klipper", "klippy/extras/resonance_tester.py") {
+                it.replace("\${TEMP_PATH}", tempPath)
+            }
+            patchBundledFile(root, assets, "kalico", "klippy/extras/resonance_tester.py") {
+                it.replace("\${TEMP_PATH}", tempPath)
             }
 
-            str = readString(assets, "klipper/klippy/mcu.py")
-            str = str.replace("\${TTY_PATH}",
-                "'" + File(KlipperApp.INSTANCE.filesDir, "serial").absolutePath + "'")
-            FileOutputStream(File(root, "klipper/klippy/mcu.py")).use {
-                it.write(str.toByteArray(Charsets.UTF_8))
+            val ttyPath = "'" + File(KlipperApp.INSTANCE.filesDir, "serial").absolutePath + "'"
+            patchBundledFile(root, assets, "klipper", "klippy/mcu.py") {
+                it.replace("\${TTY_PATH}", ttyPath)
+            }
+            patchBundledFile(root, assets, "kalico", "klippy/mcu.py") {
+                it.replace("\${TTY_PATH}", ttyPath)
             }
         } catch (e: Exception) {
             throw RuntimeException(e)
@@ -72,6 +77,9 @@ object BundleInstaller {
         deleteRecur(dir)
 
         val arr = index.optJSONArray(key)
+        if (arr == null) {
+            return
+        }
         for (i in 0 until arr.length()) {
             val file = arr.optString(i)
             val into = File(dir, file)
@@ -85,6 +93,23 @@ object BundleInstaller {
                     }
                 }
             }
+        }
+    }
+
+    private fun patchBundledFile(
+        root: File,
+        assets: android.content.res.AssetManager,
+        bundleKey: String,
+        relativePath: String,
+        transform: (String) -> String,
+    ) {
+        val target = File(root, "$bundleKey/$relativePath")
+        if (!target.exists()) {
+            return
+        }
+        val updated = transform(readString(assets, "$bundleKey/$relativePath"))
+        FileOutputStream(target).use {
+            it.write(updated.toByteArray(Charsets.UTF_8))
         }
     }
 

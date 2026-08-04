@@ -78,8 +78,6 @@
                 android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
                 android:resource="@xml/device_filter" />
         </activity>
-        <activity android:name=".CloudActivity" android:theme="@style/AppTheme"/>
-
         <service android:name=".service.CameraService" android:exported="false" android:process=":camera" android:foregroundServiceType="camera"/>
         <service android:name=".service.WebService" android:exported="false" android:foregroundServiceType="dataSync"/>
         <service android:name=".service.KlippyService_0" android:exported="false" android:process=":klippy_0" android:foregroundServiceType="connectedDevice"/>
