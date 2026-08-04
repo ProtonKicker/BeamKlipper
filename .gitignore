@@ -21,4 +21,7 @@ local.properties
 /app/src/main/assets/moonraker/timelapse.cfg
 /app/src/main/assets/update.json
 /beamklipper/
+/BeamKlipper-master.zip
+/EventBus/eventbus_api/bin/
+/EventBus/eventbus_processor/bin/
 .vscode/settings.json
