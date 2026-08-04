@@ -57,11 +57,21 @@ class KlipperInstance {
             stop()
             return
         }
-        val config = File(publicDirectory, "printer_data")
-        if (!config.exists() && !config.mkdirs()) {
-            Log.w(TAG, "Failed to create data directory ($id)")
-            stop()
-            return
+        val cfg = File(publicDirectory, "config")
+        if (!cfg.exists() && !cfg.mkdirs()) {
+            Log.w(TAG, "Failed to create config directory ($id)")
+        }
+        val gcodes = File(publicDirectory, "gcodes")
+        if (!gcodes.exists() && !gcodes.mkdirs()) {
+            Log.w(TAG, "Failed to create gcodes directory ($id)")
+        }
+        val logs = File(publicDirectory, "logs")
+        if (!logs.exists() && !logs.mkdirs()) {
+            Log.w(TAG, "Failed to create logs directory ($id)")
+        }
+        val timelapses = File(publicDirectory, "timelapses")
+        if (!timelapses.exists() && !timelapses.mkdirs()) {
+            Log.w(TAG, "Failed to create timelapses directory ($id)")
         }
 
         slot = -1

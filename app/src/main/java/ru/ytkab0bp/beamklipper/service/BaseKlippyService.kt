@@ -59,9 +59,27 @@ open class BaseKlippyService(private val num: Int) : BasePythonService() {
             val virtualInput = File(inst.directory, "vinput")
             virtualInput.createNewFile()
             logs.parentFile?.mkdirs()
+            config.mkdirs()
+            File(inst.publicDirectory, "gcodes").mkdirs()
+            File(inst.publicDirectory, "timelapses").mkdirs()
             val printerCfg = File(config, "printer.cfg")
+            var str = try {
+                printerCfg.readText(StandardCharsets.UTF_8)
+            } catch (readEx: Exception) {
+                try {
+                    val defaultName = "config/example-cartesian.cfg"
+                    val defaultContent = BundleInstaller.readString(KlipperApp.INSTANCE.assets, "klipper/$defaultName")
+                    FileOutputStream(printerCfg).use { fos ->
+                        fos.write(defaultContent.toByteArray(StandardCharsets.UTF_8))
+                    }
+                    Log.i("klippy_$num", "Seeded printer.cfg from default asset $defaultName")
+                    defaultContent
+                } catch (seedEx: Throwable) {
+                    Log.w("klippy_$num", "Failed to seed default printer.cfg", seedEx)
+                    return
+                }
+            }
             try {
-                var str = printerCfg.readText(StandardCharsets.UTF_8)
                 var changed = false
 
                 val pattern = Pattern.compile("\\[virtual_sdcard][\\r\\n ]+path: ([^\\r\\n]+)", Pattern.DOTALL)
