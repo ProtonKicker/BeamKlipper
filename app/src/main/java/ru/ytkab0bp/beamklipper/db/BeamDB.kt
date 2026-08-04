@@ -18,39 +18,6 @@ class BeamDB(context: Context?) : SQLiteOpenHelper(context, DB_NAME, null, VERSI
         db.execSQL(
             "CREATE TABLE IF NOT EXISTS $TABLE_INSTANCES ($COLUMN_ID TEXT PRIMARY KEY ON CONFLICT REPLACE, $COLUMN_NAME TEXT, $COLUMN_ICON TEXT, $COLUMN_AUTOSTART INTEGER)"
         )
-        val seeded = seedDefaultInstances(db)
-        Log.i(TAG, "onCreate: seeded=$seeded rows=${DatabaseUtils.longForQuery(db, "SELECT COUNT(*) FROM $TABLE_INSTANCES", null)}")
-    }
-
-    override fun onOpen(db: SQLiteDatabase) {
-        super.onOpen(db)
-        val cnt = try { DatabaseUtils.longForQuery(db, "SELECT COUNT(*) FROM $TABLE_INSTANCES", null) } catch (_: Throwable) { -1L }
-        val autoCount = try { DatabaseUtils.longForQuery(db, "SELECT COUNT(*) FROM $TABLE_INSTANCES WHERE $COLUMN_AUTOSTART = 1", null) } catch (_: Throwable) { -1L }
-        Log.i(TAG, "onOpen: count_before=$cnt autostart_count=$autoCount")
-        if (cnt < 2L || autoCount < 2L) {
-            try { db.execSQL("DELETE FROM $TABLE_INSTANCES") } catch (_: Throwable) {}
-            val seeded = seedDefaultInstances(db)
-            Log.i(TAG, "onOpen: reseeded=$seeded")
-        }
-    }
-
-    private fun seedDefaultInstances(db: SQLiteDatabase): Int {
-        val seed = ContentValues().apply {
-            put(COLUMN_ID, "a461a9f9-8404-46ee-a7ac-bfd1c565eebc")
-            put(COLUMN_NAME, "b")
-            put(COLUMN_ICON, InstanceIcon.PRINTER.name)
-            put(COLUMN_AUTOSTART, 1)
-        }
-        val seed2 = ContentValues().apply {
-            put(COLUMN_ID, "36bdf84b-f7bb-4615-89ff-92ba22419f78")
-            put(COLUMN_NAME, "w")
-            put(COLUMN_ICON, InstanceIcon.PRINTER.name)
-            put(COLUMN_AUTOSTART, 1)
-        }
-        val r1 = db.insertWithOnConflict(TABLE_INSTANCES, null, seed, CONFLICT_REPLACE)
-        val r2 = db.insertWithOnConflict(TABLE_INSTANCES, null, seed2, CONFLICT_REPLACE)
-        Log.i(TAG, "seedDefaultInstances: r1=$r1 r2=$r2")
-        return 2
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
