@@ -22,7 +22,7 @@ android {
         minSdk 21
         targetSdk 35
         versionCode 11
-        versionName "2.0.0_kalico"
+        versionName "2.0.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -117,7 +117,7 @@ android {
 
     applicationVariants.all { variant ->
         variant.outputs.all {
-            outputFileName = "BeamKalico_" + commit + ".apk"
+            outputFileName = "BeamKlipper_" + commit + ".apk"
         }
     }
 }

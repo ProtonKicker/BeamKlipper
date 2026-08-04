@@ -28,6 +28,28 @@ public class BaseKlippyService extends BasePythonService {
     /** @noinspection FieldCanBeLocal*/
     private int index;
 
+    private static String getStarterPrinterConfig() {
+        return "# BeamKlipper empty starter config\n" +
+                "#\n" +
+                "# Replace this file with your actual printer.cfg before connecting\n" +
+                "# a real printer MCU via USB OTG.\n" +
+                "#\n" +
+                "# Comment out the mcu section below until you have a real printer\n" +
+                "# connected. Uncomment and edit serial path when ready.\n" +
+                "#\n" +
+                "# This starter file intentionally contains no active config sections.\n\n" +
+                "# [mcu]\n" +
+                "# serial: /dev/ttyUSB0\n";
+    }
+
+    private static boolean shouldReplaceLegacyExample(String configContents) {
+        return configContents.contains("# This file is an example config file")
+                && configContents.contains("# DO NOT COPY THIS FILE")
+                && configContents.contains("[stepper_x]")
+                && configContents.contains("[mcu]")
+                && configContents.contains("/dev/ttyACM0");
+    }
+
     public BaseKlippyService(int num) {
         index = num;
     }
@@ -67,6 +89,11 @@ public class BaseKlippyService extends BasePythonService {
             logs.getParentFile().mkdirs();
             File printerCfg = new File(config, "printer.cfg");
             try {
+                if (!printerCfg.exists()) {
+                    FileOutputStream fos = new FileOutputStream(printerCfg);
+                    fos.write(getStarterPrinterConfig().getBytes(StandardCharsets.UTF_8));
+                    fos.close();
+                }
                 FileInputStream fis = new FileInputStream(printerCfg);
                 ByteArrayOutputStream bos = new ByteArrayOutputStream();
                 byte[] buffer = new byte[10240]; int c;
@@ -79,17 +106,29 @@ public class BaseKlippyService extends BasePythonService {
 
                 String str = bos.toString();
                 boolean changed = false;
+                boolean hasActiveMcuSection = Pattern.compile("(?m)^\\[mcu\\]\\s*$").matcher(str).find();
+
+                if (shouldReplaceLegacyExample(str)) {
+                    str = getStarterPrinterConfig();
+                    changed = true;
+                }
 
                 Pattern pattern = Pattern.compile("\\[virtual_sdcard][\\r\\n ]+path: ([^\\r\\n]+)", Pattern.DOTALL);
                 Matcher m = pattern.matcher(str);
-                if (m.find()) {
-                    String path = m.group(1);
-                    if (!path.startsWith(inst.getPublicDirectory().getAbsolutePath())) {
-                        str = str.substring(0, m.start()) + str.substring(m.end() + 1);
+                if (hasActiveMcuSection) {
+                    if (m.find()) {
+                        String path = m.group(1);
+                        if (!path.startsWith(inst.getPublicDirectory().getAbsolutePath())) {
+                            str = str.substring(0, m.start()) + str.substring(m.end() + 1);
+                            changed = true;
+                        }
                     }
-                }
-                if (!str.contains("[virtual_sdcard]")) {
-                    str += "\n[virtual_sdcard]\npath: " + new File(inst.getPublicDirectory(), "gcodes").getAbsolutePath() + "\n";
+                    if (!str.contains("[virtual_sdcard]")) {
+                        str += "\n[virtual_sdcard]\npath: " + new File(inst.getPublicDirectory(), "gcodes").getAbsolutePath() + "\n";
+                        changed = true;
+                    }
+                } else if (m.find()) {
+                    str = str.substring(0, m.start()) + str.substring(m.end() + 1);
                     changed = true;
                 }
                 if (changed) {
@@ -105,7 +144,7 @@ public class BaseKlippyService extends BasePythonService {
                     fos.close();
                 }
             } catch (Exception ignored) {}
-            runPython(new File(KlipperApp.INSTANCE.getFilesDir(), Prefs.getEngineKey() + "/klippy"), "klippy", "klippy.py", "-B", virtualInput.getAbsolutePath(), "-l", logs.getAbsolutePath(), "-a", socket.getAbsolutePath(), printerCfg.getAbsolutePath());
+            runPython(new File(KlipperApp.INSTANCE.getFilesDir(), Prefs.getEngineKey()), "klippy", "klippy.py", "-i", virtualInput.getAbsolutePath(), "-l", logs.getAbsolutePath(), "-a", socket.getAbsolutePath(), printerCfg.getAbsolutePath());
         } catch (Exception e) {
             Log.e("klippy_" + index, "Failed to start klippy", e);
         }
