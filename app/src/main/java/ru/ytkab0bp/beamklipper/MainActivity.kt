@@ -55,6 +55,8 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.util.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     companion object {
@@ -287,7 +289,11 @@ class MainActivity : AppCompatActivity() {
                                 .setTitle(getString(R.string.InstanceDelete, inst.name))
                                 .setMessage(R.string.InstanceDeleteConfirm)
                                 .setNegativeButton(android.R.string.cancel, null)
-                                .setPositiveButton(android.R.string.ok) { _, _ -> KlipperApp.DATABASE.delete(inst) }
+                                .setPositiveButton(android.R.string.ok) { _, _ ->
+                                    KlipperApp.appScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                        KlipperApp.DATABASE.delete(inst)
+                                    }
+                                }
                                 .show()
                             true
                         }
@@ -435,7 +441,9 @@ class MainActivity : AppCompatActivity() {
             setPadding(ViewUtils.dp(12), 0, ViewUtils.dp(12), 0)
             background = ViewUtils.resolveDrawable(this@MainActivity, android.R.attr.selectableItemBackground)
             layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(52))
+            var saving = false
             setOnClickListener {
+                if (saving) return@setOnClickListener
                 if (TextUtils.isEmpty(nameRow.text)) {
                     MaterialAlertDialogBuilder(this@MainActivity)
                         .setTitle(R.string.Error)
@@ -446,9 +454,21 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 if (editInstance != null) {
-                    editInstance!!.name = nameRow.text.toString().trim()
-                    editInstance!!.autostart = autostartRow.isChecked
-                    KlipperApp.DATABASE.update(editInstance!!)
+                    val editing = editInstance!!
+                    editing.name = nameRow.text.toString().trim()
+                    editing.autostart = autostartRow.isChecked
+                    saving = true
+                    isEnabled = false
+                    KlipperApp.appScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        try {
+                            KlipperApp.DATABASE.update(editing)
+                        } finally {
+                            runOnUiThread {
+                                saving = false
+                                isEnabled = true
+                            }
+                        }
+                    }
                     editInstance = null
                     animateNewOrEditLayout(false)
                     return@setOnClickListener
@@ -469,21 +489,29 @@ class MainActivity : AppCompatActivity() {
                     autostart = autostartRow.isChecked
                 }
                 val cfg = File(inst.publicDirectory, "config/printer.cfg")
-                cfg.parentFile?.mkdirs()
-                try {
-                    FileInputStream(File(KlipperApp.INSTANCE.filesDir, "klipper/config/${configRow.text}")).use { fis ->
-                        FileOutputStream(cfg).use { fos ->
-                            val buffer = ByteArray(10240)
-                            var c: Int
-                            while (fis.read(buffer).also { c = it } != -1) {
-                                fos.write(buffer, 0, c)
+                val cfgText = configRow.text.toString()
+                saving = true
+                isEnabled = false
+                KlipperApp.appScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    try {
+                        cfg.parentFile?.mkdirs()
+                        try {
+                            FileInputStream(File(KlipperApp.INSTANCE.filesDir, "klipper/config/$cfgText")).use { fis ->
+                                FileOutputStream(cfg).use { fos ->
+                                    fis.copyTo(fos)
+                                }
                             }
+                        } catch (e: Exception) {
+                            Log.w("MainActivity", "Failed to copy config file", e)
+                        }
+                        KlipperApp.DATABASE.insert(inst)
+                    } finally {
+                        runOnUiThread {
+                            saving = false
+                            isEnabled = true
                         }
                     }
-                } catch (e: Exception) {
-                    Log.w("MainActivity", "Failed to copy config file", e)
                 }
-                KlipperApp.DATABASE.insert(inst)
                 animateNewOrEditLayout(false)
             }
         }
@@ -646,7 +674,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (event.action == KeyEvent.ACTION_DOWN) {
-            val focusInBadges = homeView.getTargetProgress() == 1f
             val focusInList = homeView.getTargetProgress() == 0f
             val focusInSettings = homeView.getTargetProgress() == -1f
 
@@ -658,39 +685,29 @@ class MainActivity : AppCompatActivity() {
                     val adapterCount = listView.adapter?.itemCount ?: return false
                     focus != null && listView.getChildViewHolder(focus).adapterPosition == adapterCount - 1
                 } else {
-                    badgesLayout.findFocus() == refBadges.lastOrNull()
+                    false
                 }
 
                 if (!isLast) return super.onKeyDown(keyCode, event)
 
-                homeView.animateTo(if (focusInList) -1f else 0f) {
-                    if (focusInList) {
-                        preferencesView.listView.getChildAt(1).requestFocus()
-                    } else {
-                        listView.getChildAt(2 + (if (KlipperInstance.isWebServerRunning()) 1 else 0)).requestFocus()
-                    }
+                homeView.animateTo(-1f) {
+                    preferencesView.listView.getChildAt(1).requestFocus()
                 }
                 return true
             } else if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                if (focusInBadges) return super.onKeyDown(keyCode, event)
-                if (focusInList && refBadges.isEmpty()) return super.onKeyDown(keyCode, event)
+                if (focusInList) return super.onKeyDown(keyCode, event)
 
-                val isFirst = if (focusInList) {
-                    val focus = listView.findFocus()
-                    focus != null && listView.getChildViewHolder(focus).adapterPosition == 2 + (if (KlipperInstance.isWebServerRunning()) 1 else 0)
-                } else {
+                val isFirst = if (!focusInList) {
                     val focus = preferencesView.listView.findFocus()
                     focus != null && preferencesView.listView.getChildViewHolder(focus).adapterPosition == 1
+                } else {
+                    false
                 }
 
                 if (!isFirst) return super.onKeyDown(keyCode, event)
 
-                homeView.animateTo(if (focusInList) 1f else 0f) {
-                    if (focusInList) {
-                        refBadges.lastOrNull()?.requestFocus()
-                    } else {
-                        listView.getChildAt(2 + (if (KlipperInstance.isWebServerRunning()) 1 else 0)).requestFocus()
-                    }
+                homeView.animateTo(0f) {
+                    listView.getChildAt(2 + (if (KlipperInstance.isWebServerRunning()) 1 else 0)).requestFocus()
                 }
                 return true
             }
@@ -710,45 +727,14 @@ class MainActivity : AppCompatActivity() {
     fun isCurrentLauncher(): Boolean = isCurrentLauncher
 
     @EventHandler(runOnMainThread = true)
+    fun onInstancesRefreshed(e: InstancesRefreshedEvent) {
+        instances = ArrayList(KlipperInstance.getInstances())
+        listView.adapter?.notifyDataSetChanged()
+    }
+
+    @EventHandler(runOnMainThread = true)
     fun onFrontendChanged(e: WebFrontendChangedEvent) {
         listView.adapter?.notifyItemChanged(1)
-    }
-
-    @EventHandler(runOnMainThread = true)
-    fun onInstanceCreated(e: InstanceCreatedEvent) {
-        instances.add(KlipperInstance.getInstance(e.id) ?: return)
-        listView.adapter?.notifyItemInserted((listView.adapter?.itemCount ?: 0) - 2)
-    }
-
-    @EventHandler(runOnMainThread = true)
-    fun onInstanceUpdated(e: InstanceUpdatedEvent) {
-        var idx = -1
-        for (j in instances.indices) {
-            if (instances[j].id == e.id) {
-                idx = j
-                val instanceId = instances[idx].id ?: continue
-                instances[idx] = KlipperInstance.getInstance(instanceId) ?: continue
-                break
-            }
-        }
-        if (idx != -1) {
-            listView.adapter?.notifyItemChanged(idx + 2, NOTIFY_LIVE)
-        }
-    }
-
-    @EventHandler(runOnMainThread = true)
-    fun onInstanceDestroyed(e: InstanceDestroyedEvent) {
-        var idx = -1
-        for (j in instances.indices) {
-            if (instances[j].id == e.id) {
-                idx = j
-                break
-            }
-        }
-        if (idx != -1) {
-            instances.removeAt(idx)
-            listView.adapter?.notifyItemRemoved(idx + 2)
-        }
     }
 
     private fun animateNewOrEditLayout(visible: Boolean) {
@@ -854,10 +840,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun invalidateHomeProgress(progress: Float) {
-        val beb = 0.3f
-        val posProgress = maxOf(0f, progress)
+        val posProgress = 0f
         for (i in refBadges.indices) {
             val j = refBadges.size - 1 - i
+            val beb = 0.3f
             val pr = (maxOf(posProgress, beb * j) - beb * j) / (1f - beb * j)
 
             val badge = refBadges[i] ?: continue
@@ -874,17 +860,16 @@ class MainActivity : AppCompatActivity() {
             badge.translationX = ViewUtils.lerp(fX.toFloat(), tX, pr)
             badge.translationY = ViewUtils.lerp(fY, tY.toFloat(), pr)
         }
-        titleView.translationX = posProgress * ((badgesLayout.width - titleView.width) / 2f - ViewUtils.dp(28 + 12))
-        titleView.translationY = posProgress * ViewUtils.dp(92 - 52)
+        titleView.translationX = 0f
+        titleView.translationY = 0f
 
-        val scale = ViewUtils.lerp(ViewUtils.dp(28).toFloat(), ViewUtils.dp(52).toFloat(), posProgress) / ViewUtils.dp(28)
-        logoView.scaleX = scale
-        logoView.scaleY = scale
-        logoView.translationX = posProgress * (badgesLayout.width - logoView.width) / 2f
-        logoView.translationY = (if (posProgress < 0.5f) posProgress * 2 else 1f - (posProgress - 0.5f) * 2) * -ViewUtils.dp(12)
+        logoView.scaleX = 1f
+        logoView.scaleY = 1f
+        logoView.translationX = 0f
+        logoView.translationY = 0f
 
         val negProgress = minOf(0f, progress)
-        listCardView.translationY = progress * ViewUtils.dp(92 + (22 + 18) * refBadges.size + 10 * (refBadges.size - 1))
+        listCardView.translationY = negProgress * ViewUtils.dp(92 + (22 + 18) * refBadges.size + 10 * (refBadges.size - 1))
         listCardView.alpha = 1f + negProgress
 
         preferencesView.setProgress(-negProgress)

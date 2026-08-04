@@ -14,7 +14,7 @@ import com.google.android.material.bottomsheet.BottomSheetDialog
 import org.json.JSONObject
 import ru.ytkab0bp.beamklipper.R
 import ru.ytkab0bp.beamklipper.utils.ViewUtils
-import java.io.ByteArrayOutputStream
+import java.nio.charset.StandardCharsets
 import java.util.Locale
 
 class ChangeLogBottomSheet(context: Context) : BottomSheetDialog(context) {
@@ -55,16 +55,9 @@ class ChangeLogBottomSheet(context: Context) : BottomSheetDialog(context) {
 
         try {
             context.assets.open("update.json").use { inp ->
-                ByteArrayOutputStream().use { bos ->
-                    val buffer = ByteArray(10240)
-                    var c: Int
-                    while (inp.read(buffer).also { c = it } != -1) {
-                        bos.write(buffer, 0, c)
-                    }
-                    val obj = JSONObject(bos.toString())
-                    val code = Locale.getDefault().language
-                    text.text = if (obj.has(code)) obj.getString(code) else obj.getString("en")
-                }
+                val obj = JSONObject(inp.readBytes().toString(StandardCharsets.UTF_8))
+                val code = Locale.getDefault().language
+                text.text = if (obj.has(code)) obj.getString(code) else obj.getString("en")
             }
         } catch (e: Exception) {
             Log.e("Changelog", "Failed to open update file", e)

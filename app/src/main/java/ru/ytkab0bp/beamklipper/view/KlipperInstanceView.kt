@@ -131,11 +131,6 @@ class KlipperInstanceView(context: Context) : LinearLayout(context) {
                 title.setText(R.string.Fluidd)
                 setColorIndex(9)
             }
-            Prefs.FRONTEND_KALICO -> {
-                icon.setImageResource(R.drawable.ic_sailing_24)
-                title.setText(R.string.Kalico)
-                setColorIndex(4)
-            }
             else -> {
                 icon.setImageResource(R.drawable.ic_sailing_24)
                 title.setText(R.string.Mainsail)

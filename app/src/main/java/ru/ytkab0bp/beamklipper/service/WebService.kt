@@ -262,18 +262,12 @@ class WebService : Service() {
                         for ((key, value) in session.headers) {
                             con.addRequestProperty(key, value)
                         }
-                        val len = session.headers["content-length"]?.toLongOrNull() ?: 0L
-                        val input = session.inputStream
-                        val output = con.outputStream
-                        val buffer = ByteArray(10240)
-                        var totalWritten = 0
-                        while (totalWritten < len) {
-                            val c = input.read(buffer)
-                            if (c == -1) break
-                            output.write(buffer, 0, c)
-                            totalWritten += c
+                        con.doOutput = true
+                        session.inputStream.use { input ->
+                            con.outputStream.use { output ->
+                                input.copyTo(output)
+                            }
                         }
-                        output.close()
                     }
                     val responseStream = if (con.responseCode in 200..299) con.inputStream else con.errorStream
                     val r = Response.newChunkedResponse(Status.OK, con.contentType, responseStream)

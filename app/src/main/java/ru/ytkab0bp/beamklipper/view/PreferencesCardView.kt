@@ -235,13 +235,11 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
                                         .setTitle(R.string.WebFrontend)
                                         .setItems(arrayOf(
                                             KlipperApp.INSTANCE.getString(R.string.Fluidd),
-                                            KlipperApp.INSTANCE.getString(R.string.Mainsail),
-                                            KlipperApp.INSTANCE.getString(R.string.Kalico)
+                                            KlipperApp.INSTANCE.getString(R.string.Mainsail)
                                         ), DialogInterface.OnClickListener { dialog, which ->
                                             Prefs.webFrontend = when (which) {
                                                 0 -> Prefs.FRONTEND_FLUIDD
-                                                1 -> Prefs.FRONTEND_MAINSAIL
-                                                else -> Prefs.FRONTEND_KALICO
+                                                else -> Prefs.FRONTEND_MAINSAIL
                                             }
                                             adapter.notifyItemChanged(holder.adapterPosition)
                                         })
@@ -372,7 +370,6 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
     private fun frontendTitle(frontend: String): String {
         val resId = when (frontend) {
             Prefs.FRONTEND_FLUIDD -> R.string.Fluidd
-            Prefs.FRONTEND_KALICO -> R.string.Kalico
             else -> R.string.Mainsail
         }
         return KlipperApp.INSTANCE.getString(resId)

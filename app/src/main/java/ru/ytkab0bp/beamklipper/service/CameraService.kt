@@ -56,6 +56,7 @@ class CameraService : Service() {
         const val KEY_AUTOFOCUS = "autofocus"
         const val KEY_FOCUS = "focus"
         private const val TAG = "beam_camera"
+        private const val DESCRIPTOR = "ru.ytkab0bp.beamklipper.ICameraService"
         private val PATH_PATTERN = Pattern.compile("GET ([^\\r\\n]+) HTTP/1\\.[0-1]")
         private const val PORT = 8889
         private const val ID = 400000
@@ -71,6 +72,10 @@ class CameraService : Service() {
     private var captureSession: CameraCaptureSession? = null
     private var captureRequestBuilder: CaptureRequest.Builder? = null
     private var wakeLock: PowerManager.WakeLock? = null
+
+    private val serviceBinder = object : Binder() {
+        override fun getInterfaceDescriptor(): String = DESCRIPTOR
+    }
 
     private val receiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -120,7 +125,7 @@ class CameraService : Service() {
         } else {
             startForeground(ID, not.build())
         }
-        return Binder()
+        return serviceBinder
     }
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag", "WakelockTimeout")

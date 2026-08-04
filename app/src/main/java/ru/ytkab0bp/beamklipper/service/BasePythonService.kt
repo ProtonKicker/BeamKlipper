@@ -12,12 +12,15 @@ import android.util.Log
 import com.chaquo.python.PyObject
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
+import kotlinx.coroutines.runBlocking
 import java.io.File
+import ru.ytkab0bp.beamklipper.KlipperApp
 import ru.ytkab0bp.beamklipper.KlipperInstance
 
 open class BasePythonService : Service() {
     companion object {
         const val KEY_INSTANCE = "instance"
+        private const val DESCRIPTOR = "ru.ytkab0bp.beamklipper.IBasePythonService"
     }
 
     private val TAG = "python_service"
@@ -27,11 +30,18 @@ open class BasePythonService : Service() {
     protected var instance: KlipperInstance? = null
     protected lateinit var notificationManager: NotificationManager
 
+    private val serviceBinder = object : Binder() {
+        override fun getInterfaceDescriptor(): String = DESCRIPTOR
+    }
+
     override fun onBind(intent: Intent?): IBinder? {
-        val id = intent?.getStringExtra(KEY_INSTANCE) ?: return null
+        val id = intent?.getStringExtra(KEY_INSTANCE); Log.i("beam_service", "onBind id: $id"); if(id==null) return null
         instance = KlipperInstance.getInstance(id)
-        pythonHandler?.post { onStartPython() }
-        return Binder()
+        pythonHandler?.post {
+            runBlocking { KlipperApp.bundleInstallJob.await() }
+            onStartPython()
+        }
+        return serviceBinder
     }
 
     override fun onCreate() {
@@ -42,23 +52,45 @@ open class BasePythonService : Service() {
         pythonHandler = Handler(pythonThread!!.looper)
         pythonHandler?.post {
             android.os.Process.setThreadPriority(-4)
-            val platform = AndroidPlatform(this@BasePythonService)
+            runBlocking { KlipperApp.bundleInstallJob.await() }
+            KlipperApp.seedChaquopyDirLocked(this@BasePythonService)
             var retries = 0
-            while (retries < 10) {
+            var lastErr: Throwable? = null
+            while (retries < 4 && py == null) {
                 try {
-                    platform.path
-                    Python.start(platform)
-                    py = Python.getInstance()
-                    break
+                    KlipperApp.withChaquopyLock(this@BasePythonService) {
+                        val platform = AndroidPlatform(this@BasePythonService)
+                        platform.path
+                        Python.start(platform)
+                        py = Python.getInstance()
+                    }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to start Python (attempt ${retries + 1}/10)", e)
+                    Log.e(TAG, "Failed to start Python (attempt ${retries + 1}/4)", e)
+                    lastErr = e
+                    if (e is IllegalStateException) break
+                    val isFileIOErr = (e.cause is java.io.FileNotFoundException) ||
+                        (e is java.io.FileNotFoundException) ||
+                        (e.cause is java.io.IOException) ||
+                        (e is java.io.IOException) ||
+                        e.message?.contains("No such file or directory") == true ||
+                        e.message?.contains("Failed to create") == true
+                    if (isFileIOErr) {
+                        try {
+                            val chaquopyDir = File(filesDir, "chaquopy")
+                            if (chaquopyDir.exists()) {
+                                chaquopyDir.deleteRecursively()
+                            }
+                        } catch (_: Throwable) {}
+                    }
                     retries++
-                    try { Thread.sleep(500) } catch (_: InterruptedException) {}
+                    try { Thread.sleep(500L * (retries + 1)) } catch (_: InterruptedException) {}
                 }
             }
             if (py == null) {
-                Log.e(TAG, "Failed to start Python after 10 attempts, stopping service")
+                Log.e(TAG, "Failed to start Python after ${retries + 1} attempts, stopping service", lastErr)
                 stopSelf()
+                try { Thread.sleep(100) } catch (_: Throwable) {}
+                android.os.Process.killProcess(android.os.Process.myPid())
             }
         }
     }
@@ -75,7 +107,8 @@ open class BasePythonService : Service() {
 
     protected fun runPython(dir: File, module: String, vararg args: String) {
         val p = py ?: return
-        p.getModule("sys")!!["path"]!!.callAttr("append", dir.absolutePath)
+        val sysPath = p.getModule("sys")!!["path"]!!
+        sysPath.callAttr("insert", 0, dir.absolutePath)
         val pyModule = Python.getInstance().getModule(module)
         val argv = pyModule!!["sys"]!!["argv"]!!.asList()
         argv.clear()

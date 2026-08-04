@@ -74,7 +74,7 @@ android {
                 install "click==8.1.8"
             }
             pyc {
-                src false
+                src true
             }
         }
         ndk {
@@ -102,8 +102,9 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+        coreLibraryDesugaringEnabled true
     }
 
     externalNativeBuild {
@@ -123,7 +124,7 @@ android {
     }
 
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "11"
     }
 
     applicationVariants.all { variant ->
@@ -149,6 +150,9 @@ dependencies {
     implementation 'com.google.code.gson:gson:2.13.1'
     implementation 'androidx.multidex:multidex:2.0.1'
     implementation 'com.github.androidmads:QRGenerator:1.0.5'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1'
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.3'
 
     implementation project(":eventbus")
     implementation project(":eventbus_api")

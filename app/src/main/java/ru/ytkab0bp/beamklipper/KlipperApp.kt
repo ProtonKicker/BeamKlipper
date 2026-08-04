@@ -6,12 +6,26 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
+import android.util.Log
 import java.io.File
+import java.io.IOException
+import java.io.RandomAccessFile
+import java.nio.channels.FileLock
 import androidx.multidex.MultiDexApplication
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import ru.ytkab0bp.beamklipper.db.BeamDB
 import ru.ytkab0bp.beamklipper.serial.UsbSerialManager
 import ru.ytkab0bp.beamklipper.utils.Prefs
 import ru.ytkab0bp.eventbus.EventBus
+import com.chaquo.python.Python
+import com.chaquo.python.android.AndroidPlatform
 
 class KlipperApp : MultiDexApplication() {
     override fun attachBaseContext(base: Context) {
@@ -74,10 +88,8 @@ class KlipperApp : MultiDexApplication() {
         INSTANCE = this
         Prefs.init(this)
         DATABASE = BeamDB(this)
-        KlipperInstance.onInstancesLoadedFromDB(DATABASE.getInstances())
         EventBus.registerImpl(this)
         Prefs.applyAppLanguage()
-        BundleInstaller.init(this)
 
         hasUpdateInfo = try {
             assets.open("update.json").close()
@@ -92,8 +104,43 @@ class KlipperApp : MultiDexApplication() {
                 NotificationChannel(SERVICES_CHANNEL, getString(R.string.ServicesChannel), NotificationManager.IMPORTANCE_LOW))
         }
 
-        if (getProcessNameCompat() == packageName) {
-            UsbSerialManager.init(this)
+        val isMainProcess = getProcessNameCompat() == packageName
+
+        bundleInstallJob = appScope.async(Dispatchers.IO) {
+            BundleInstaller.init(this@KlipperApp)
+            if (isMainProcess) {
+                seedChaquopyDirLocked(this@KlipperApp)
+            }
+        }
+
+        if (!isMainProcess) {
+            runBlocking { bundleInstallJob.await() }
+            waitForChaquopySeed()
+        }
+
+        if (isMainProcess) {
+            appScope.launch {
+                runBlocking { bundleInstallJob.await() }
+                waitForChaquopySeed()
+                Log.i("beam_app", "BundleInstaller+seed done, loading instances from DB")
+                val instances = withContext(Dispatchers.IO) {
+                    DATABASE.getInstances()
+                }
+                Log.i("beam_app", "DB.getInstances() returned ${instances.size} rows")
+                KlipperInstance.onInstancesLoadedFromDB(instances)
+            }
+            appScope.launch(Dispatchers.IO) {
+                UsbSerialManager.init(this@KlipperApp)
+            }
+        }
+    }
+
+    private fun waitForChaquopySeed() {
+        val marker = File(filesDir, CHAQUOPY_SEED_MARKER)
+        var attempts = 0
+        while (!marker.exists() && attempts < 200) {
+            try { Thread.sleep(50) } catch (_: InterruptedException) { break }
+            attempts++
         }
     }
 
@@ -110,10 +157,60 @@ class KlipperApp : MultiDexApplication() {
     }
 
     companion object {
+        private const val CHAQUOPY_SEED_MARKER = ".chaquopy_seed_v1"
+        private const val CHAQUOPY_LOCK_NAME = ".chaquopy_lock"
+
+        fun withChaquopyLock(ctx: Context, action: () -> Unit) {
+            val lockFile = File(ctx.filesDir, CHAQUOPY_LOCK_NAME)
+            var raf: RandomAccessFile? = null
+            var lock: FileLock? = null
+            try {
+                raf = RandomAccessFile(lockFile, "rw")
+                lock = raf.channel.lock()
+                action()
+            } finally {
+                try { lock?.release() } catch (_: Throwable) {}
+                try { raf?.close() } catch (_: Throwable) {}
+            }
+        }
+
+        fun seedChaquopyDirLocked(ctx: Context) {
+            withChaquopyLock(ctx) {
+                val marker = File(ctx.filesDir, CHAQUOPY_SEED_MARKER)
+                if (marker.exists()) return@withChaquopyLock
+                try {
+                    val platform = AndroidPlatform(ctx)
+                    platform.path
+                    try {
+                        if (!Python.isStarted()) {
+                            Python.start(platform)
+                        }
+                    } catch (_: IllegalStateException) {
+                    } catch (_: Throwable) {
+                        try { File(ctx.filesDir, "chaquopy").deleteRecursively() } catch (_: Throwable) {}
+                        try {
+                            if (!Python.isStarted()) {
+                                Python.start(AndroidPlatform(ctx))
+                            }
+                        } catch (_: Throwable) {}
+                    }
+                } catch (_: Throwable) {}
+                try {
+                    File(ctx.filesDir, "chaquopy").mkdirs()
+                    marker.createNewFile()
+                } catch (_: Throwable) {}
+            }
+        }
+
         @JvmField
         val PERMISSION = BuildConfig.APPLICATION_ID + ".permission.INTERNAL_BROADCASTS"
         @JvmField
         val SERVICES_CHANNEL = "services"
+
+        @JvmField
+        val appScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+        lateinit var bundleInstallJob: Deferred<Unit>
 
         lateinit var INSTANCE: KlipperApp
         lateinit var DATABASE: BeamDB

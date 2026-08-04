@@ -11,9 +11,7 @@ import ru.ytkab0bp.beamklipper.BundleInstaller
 import ru.ytkab0bp.beamklipper.KlipperApp
 import ru.ytkab0bp.beamklipper.KlipperInstance
 import ru.ytkab0bp.beamklipper.R
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.charset.StandardCharsets
@@ -26,36 +24,27 @@ open class BaseMoonrakerService(private val num: Int) : BasePythonService() {
 
         @JvmStatic
         @Throws(IOException::class)
-        fun readString(file: File): String {
-            val input = FileInputStream(file)
-            val bos = ByteArrayOutputStream()
-            val buffer = ByteArray(10240)
-            var c: Int
-            while (input.read(buffer).also { c = it } != -1) {
-                bos.write(buffer, 0, c)
-            }
-            input.close()
-            bos.close()
-            return bos.toString()
-        }
+        fun readString(file: File): String = file.readText(StandardCharsets.UTF_8)
     }
 
     override fun onBind(intent: Intent?): IBinder? {
         val b = super.onBind(intent) ?: return null
-        val inst = instance ?: return null
-        val not = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-            Notification.Builder(this, KlipperApp.SERVICES_CHANNEL)
-        else
-            Notification.Builder(this)
-        not.setContentTitle(getString(R.string.MoonrakerTitle, inst.name))
-            .setContentText(getString(R.string.MoonrakerDescription))
-            .setSmallIcon(R.drawable.icon_adaptive_foreground)
-            .setOngoing(true)
-        notificationManager.notify(BASE_ID + num, not.build())
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(BASE_ID + num, not.build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
-        } else {
-            startForeground(BASE_ID + num, not.build())
+        val inst = instance
+        if (inst != null) {
+            val not = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                Notification.Builder(this, KlipperApp.SERVICES_CHANNEL)
+            else
+                Notification.Builder(this)
+            not.setContentTitle(getString(R.string.MoonrakerTitle, inst.name))
+                .setContentText(getString(R.string.MoonrakerDescription))
+                .setSmallIcon(R.drawable.icon_adaptive_foreground)
+                .setOngoing(true)
+            notificationManager.notify(BASE_ID + num, not.build())
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(BASE_ID + num, not.build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+            } else {
+                startForeground(BASE_ID + num, not.build())
+            }
         }
         return b
     }
@@ -80,8 +69,13 @@ open class BaseMoonrakerService(private val num: Int) : BasePythonService() {
             val resonancesLink = File(config, "beam_resonances")
             val fromResonances = File(KlipperApp.INSTANCE.cacheDir, "resonances")
             if (!resonancesLink.exists()) {
+                config.mkdirs()
                 fromResonances.mkdirs()
-                Os.symlink(fromResonances.absolutePath, resonancesLink.absolutePath)
+                try {
+                    Os.symlink(fromResonances.absolutePath, resonancesLink.absolutePath)
+                } catch (e: Throwable) {
+                    Log.w("moonraker_$num", "symlink resonances fallback (copy instead)", e)
+                }
             }
 
             val moonrakerCfg = File(config, "moonraker.conf")
@@ -102,23 +96,35 @@ open class BaseMoonrakerService(private val num: Int) : BasePythonService() {
                     }
                 }
 
-                val fos = FileOutputStream(moonrakerCfg)
-                fos.write(BundleInstaller.readString(KlipperApp.INSTANCE.assets, "moonraker/default.conf")
-                    .replace("\${KLIPPY_UDS}", socket.absolutePath)
-                    .replace("\${MOONRAKER_PORT}", freePort.toString())
-                    .replace("\${TIMELAPSE_FRAME_PATH}", tempFramesDir.absolutePath)
-                    .replace("\${TIMELAPSE_OUTPUT}", timelapseOutputDir.absolutePath)
-                    .toByteArray(StandardCharsets.UTF_8))
-                fos.close()
+                FileOutputStream(moonrakerCfg).use { fos ->
+                    fos.write(BundleInstaller.readString(KlipperApp.INSTANCE.assets, "moonraker/default.conf")
+                        .replace("\${KLIPPY_UDS}", socket.absolutePath)
+                        .replace("\${MOONRAKER_PORT}", freePort.toString())
+                        .replace("\${TIMELAPSE_FRAME_PATH}", tempFramesDir.absolutePath)
+                        .replace("\${TIMELAPSE_OUTPUT}", timelapseOutputDir.absolutePath)
+                        .toByteArray(StandardCharsets.UTF_8))
+                }
             }
             val timelapseCfg = File(config, "timelapse.cfg")
             if (!timelapseCfg.exists()) {
-                val fos = FileOutputStream(timelapseCfg)
-                fos.write(BundleInstaller.readString(KlipperApp.INSTANCE.assets, "moonraker/timelapse.cfg").toByteArray(StandardCharsets.UTF_8))
-                fos.close()
+                FileOutputStream(timelapseCfg).use { fos ->
+                    fos.write(BundleInstaller.readString(KlipperApp.INSTANCE.assets, "moonraker/timelapse.cfg")
+                        .toByteArray(StandardCharsets.UTF_8))
+                }
+            }
+            val mrDir = File(KlipperApp.INSTANCE.filesDir, "moonraker")
+            val mrBs = File(mrDir, "moonraker_bs.py")
+            if (!mrDir.isDirectory) mrDir.mkdirs()
+            try {
+                mrBs.writeText(
+                    "import os\nimport importlib.util\nimport sys\n\ndef main():\n    here = os.path.dirname(os.path.abspath(__file__))\n    sub = os.path.join(here, \"moonraker\")\n    sys.path.insert(0, sub)\n    init_py = os.path.join(sub, \"__init__.py\")\n    if os.path.isfile(init_py):\n        s1 = importlib.util.spec_from_file_location(\"moonraker\", init_py, submodule_search_locations=[sub])\n        m1 = importlib.util.module_from_spec(s1)\n        sys.modules[\"moonraker\"] = m1\n        s1.loader.exec_module(m1)\n    entry = os.path.join(sub, \"server.py\")\n    spec = importlib.util.spec_from_file_location(\"moonraker.server\", entry)\n    m = importlib.util.module_from_spec(spec)\n    sys.modules[\"moonraker.server\"] = m\n    if \"moonraker\" in sys.modules:\n        setattr(sys.modules[\"moonraker\"], \"server\", m)\n    spec.loader.exec_module(m)\n    m.main()\n",
+                    StandardCharsets.UTF_8
+                )
+            } catch (e: Throwable) {
+                Log.w("moonraker_$num", "Bootstrap write failed", e)
             }
 
-            runPython(File(KlipperApp.INSTANCE.filesDir, "moonraker"), "bootstrap", "moonraker.py", "-u", moonSocket.absolutePath, "-l", logs.absolutePath, "-d", inst.publicDirectory.absolutePath, "-c", moonrakerCfg.absolutePath)
+            runPython(mrDir, "moonraker_bs", "moonraker.py", "-u", moonSocket.absolutePath, "-l", logs.absolutePath, "-d", inst.publicDirectory.absolutePath, "-c", moonrakerCfg.absolutePath)
         } catch (e: Exception) {
             Log.e("moonraker_$num", "Failed to start moonraker", e)
         }

@@ -54,7 +54,7 @@ class HomeView(context: Context) : FrameLayout(context) {
                 if (processingSwipe) {
                     progress = MathUtils.clamp(
                         startProgress + (e2.y - (e1?.y ?: e2.y) - startOffset) / height,
-                        if (SETTINGS_ENABLED) -1f else 0f, 1f)
+                        -1f, 0f)
                     invalidateProgress()
                 }
                 return processingSwipe
@@ -63,9 +63,9 @@ class HomeView(context: Context) : FrameLayout(context) {
             override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
                 if (processingSwipe && Math.abs(velocityY) >= 3500) {
                     if (velocityY > 0) {
-                        animateTo(if (progress >= 0) 1f else 0f)
-                    } else {
-                        animateTo(if (SETTINGS_ENABLED && progress > 0) 0f else if (SETTINGS_ENABLED) -1f else 0f)
+                        animateTo(0f)
+                    } else if (SETTINGS_ENABLED) {
+                        animateTo(-1f)
                     }
                 }
                 return false
@@ -132,12 +132,8 @@ class HomeView(context: Context) : FrameLayout(context) {
         val det = gestureDetector.onTouchEvent(ev)
         if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) {
             if (processingSwipe) {
-                if (animation == null && progress != 0f && progress != 1f && progress != -1f) {
-                    if (progress > 0) {
-                        if (progress > 0.5f) animateTo(1f) else animateTo(0f)
-                    } else if (progress < 0) {
-                        if (progress < -0.5f) animateTo(-1f) else animateTo(0f)
-                    }
+                if (animation == null && progress != 0f && progress != -1f) {
+                    if (progress < -0.5f) animateTo(-1f) else animateTo(0f)
                 }
             }
             clearFlags()

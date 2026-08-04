@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
-import android.preference.PreferenceManager
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 
@@ -22,6 +21,7 @@ object Prefs {
     const val ENGINE_KALICO = "kalico"
     const val FRONTEND_FLUIDD = "fluidd"
     const val FRONTEND_MAINSAIL = "mainsail"
+    @Deprecated("Kalico was never a frontend; duplicates Mainsail assets. Migrate to FRONTEND_MAINSAIL.")
     const val FRONTEND_KALICO = "kalico_frontend"
     const val LANGUAGE_SYSTEM = "system"
     const val LANGUAGE_ENGLISH = "en"
@@ -112,13 +112,13 @@ object Prefs {
     }
 
     fun init(ctx: Context) {
-        mPrefs = PreferenceManager.getDefaultSharedPreferences(ctx)
+        mPrefs = ctx.getSharedPreferences("${ctx.packageName}_preferences", Context.MODE_PRIVATE)
     }
 
     var webFrontend: String
         get() {
             val legacyMainsail = mPrefs.contains("mainsail")
-            return if (legacyMainsail) {
+            val raw = if (legacyMainsail) {
                 val migrated = if (getSafeBoolean("mainsail", true)) FRONTEND_MAINSAIL else FRONTEND_FLUIDD
                 try {
                     mPrefs.edit().putString("web_frontend", migrated).remove("mainsail").apply()
@@ -127,6 +127,12 @@ object Prefs {
             } else {
                 getSafeString("web_frontend", FRONTEND_MAINSAIL)
             }
+            @Suppress("DEPRECATION")
+            if (raw == FRONTEND_KALICO) {
+                try { mPrefs.edit().putString("web_frontend", FRONTEND_MAINSAIL).apply() } catch (_: Throwable) {}
+                return FRONTEND_MAINSAIL
+            }
+            return raw
         }
         set(value) {
             mPrefs.edit().putString("web_frontend", value).remove("mainsail").apply()

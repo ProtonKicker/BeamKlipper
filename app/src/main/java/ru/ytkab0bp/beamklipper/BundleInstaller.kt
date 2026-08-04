@@ -2,9 +2,9 @@ package ru.ytkab0bp.beamklipper
 
 import android.content.Context
 import org.json.JSONObject
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.nio.charset.StandardCharsets
 
 object BundleInstaller {
     @JvmStatic
@@ -42,7 +42,7 @@ object BundleInstaller {
             str = str.replace("TTY_PATH = \"/sys/class/tty\"",
                 "TTY_PATH = \"" + File(KlipperApp.INSTANCE.filesDir, "serial").absolutePath + "\"")
             FileOutputStream(File(root, "moonraker/moonraker/utils/sysfs_devs.py")).use {
-                it.write(str.toByteArray(Charsets.UTF_8))
+                it.write(str.toByteArray(StandardCharsets.UTF_8))
             }
 
             val tempPath = File(KlipperApp.INSTANCE.cacheDir, "resonances").absolutePath
@@ -65,16 +65,9 @@ object BundleInstaller {
         }
     }
 
-    private fun deleteRecur(f: File) {
-        if (f.isDirectory) {
-            f.listFiles()?.forEach { deleteRecur(it) }
-        }
-        f.delete()
-    }
-
     private fun unpack(assets: android.content.res.AssetManager, index: JSONObject, root: File, key: String) {
         val dir = File(root, key)
-        deleteRecur(dir)
+        dir.deleteRecursively()
 
         val arr = index.optJSONArray(key)
         if (arr == null) {
@@ -86,11 +79,7 @@ object BundleInstaller {
             into.parentFile?.mkdirs()
             assets.open("$key/$file").use { inp ->
                 FileOutputStream(into).use { fos ->
-                    val buffer = ByteArray(10240)
-                    var c: Int
-                    while (inp.read(buffer).also { c = it } != -1) {
-                        fos.write(buffer, 0, c)
-                    }
+                    inp.copyTo(fos)
                 }
             }
         }
@@ -109,21 +98,14 @@ object BundleInstaller {
         }
         val updated = transform(readString(assets, "$bundleKey/$relativePath"))
         FileOutputStream(target).use {
-            it.write(updated.toByteArray(Charsets.UTF_8))
+            it.write(updated.toByteArray(StandardCharsets.UTF_8))
         }
     }
 
     @JvmStatic
     fun readString(assets: android.content.res.AssetManager, key: String): String {
         return assets.open(key).use { inp ->
-            ByteArrayOutputStream().use { bos ->
-                val buffer = ByteArray(10240)
-                var c: Int
-                while (inp.read(buffer).also { c = it } != -1) {
-                    bos.write(buffer, 0, c)
-                }
-                bos.toString()
-            }
+            inp.readBytes().toString(StandardCharsets.UTF_8)
         }
     }
 }
