@@ -299,6 +299,7 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
                                             arrayOf(
                                                 KlipperApp.INSTANCE.getString(R.string.LanguageSystem),
                                                 KlipperApp.INSTANCE.getString(R.string.LanguageEnglish),
+                                                KlipperApp.INSTANCE.getString(R.string.LanguageRussian),
                                                 KlipperApp.INSTANCE.getString(R.string.LanguageChineseSimplified),
                                                 KlipperApp.INSTANCE.getString(R.string.LanguageChineseTraditional)
                                             )
@@ -306,7 +307,8 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
                                             Prefs.appLanguage = when (which) {
                                                 0 -> Prefs.LANGUAGE_SYSTEM
                                                 1 -> Prefs.LANGUAGE_ENGLISH
-                                                2 -> Prefs.LANGUAGE_CHINESE_SIMPLIFIED
+                                                2 -> Prefs.LANGUAGE_RUSSIAN
+                                                3 -> Prefs.LANGUAGE_CHINESE_SIMPLIFIED
                                                 else -> Prefs.LANGUAGE_CHINESE_TRADITIONAL
                                             }
                                             Prefs.applyAppLanguage()
@@ -386,6 +388,7 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
         return KlipperApp.INSTANCE.getString(
             when (language) {
                 Prefs.LANGUAGE_ENGLISH -> R.string.LanguageEnglish
+                Prefs.LANGUAGE_RUSSIAN -> R.string.LanguageRussian
                 Prefs.LANGUAGE_CHINESE_SIMPLIFIED -> R.string.LanguageChineseSimplified
                 Prefs.LANGUAGE_CHINESE_TRADITIONAL -> R.string.LanguageChineseTraditional
                 else -> R.string.LanguageSystem

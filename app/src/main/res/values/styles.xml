@@ -20,9 +20,5 @@
         <item name="startStopButtonColor_8">#db36a4</item>
         <item name="startStopButtonColor_9">#3b76ff</item>
         <item name="textColorDanger">#e12336</item>
-        <item name="boostyColor">#f15a2c</item>
-        <item name="telegramColor">#33bbff</item>
-        <item name="boostyColorTop">#f06e2a</item>
-        <item name="boostyColorBottom">#884725</item>
     </style>
 </resources>

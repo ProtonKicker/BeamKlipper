@@ -25,10 +25,91 @@ object Prefs {
     const val FRONTEND_KALICO = "kalico_frontend"
     const val LANGUAGE_SYSTEM = "system"
     const val LANGUAGE_ENGLISH = "en"
+    const val LANGUAGE_RUSSIAN = "ru"
     const val LANGUAGE_CHINESE_SIMPLIFIED = "zh-CN"
     const val LANGUAGE_CHINESE_TRADITIONAL = "zh-TW"
 
     private lateinit var mPrefs: SharedPreferences
+
+    private fun getSafeString(key: String, default: String): String {
+        return try {
+            mPrefs.getString(key, default) ?: default
+        } catch (_: ClassCastException) {
+            val raw = mPrefs.all[key]
+            if (raw != null) {
+                val migrated = raw.toString()
+                try { mPrefs.edit().putString(key, migrated).apply() } catch (_: Throwable) {}
+                migrated
+            } else default
+        } catch (_: Throwable) {
+            default
+        }
+    }
+
+    private fun getSafeStringNullable(key: String): String? {
+        return try {
+            mPrefs.getString(key, null)
+        } catch (_: ClassCastException) {
+            val raw = mPrefs.all[key]
+            if (raw != null) {
+                val migrated = raw.toString()
+                try { mPrefs.edit().putString(key, migrated).apply() } catch (_: Throwable) {}
+                migrated
+            } else null
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    private fun getSafeInt(key: String, default: Int): Int {
+        return try {
+            mPrefs.getInt(key, default)
+        } catch (_: ClassCastException) {
+            val raw = mPrefs.all[key]
+            when (raw) {
+                is Number -> {
+                    val migrated = raw.toInt()
+                    try { mPrefs.edit().putInt(key, migrated).apply() } catch (_: Throwable) {}
+                    migrated
+                }
+                is String -> raw.toIntOrNull() ?: default
+                else -> default
+            }
+        } catch (_: Throwable) {
+            default
+        }
+    }
+
+    private fun getSafeBoolean(key: String, default: Boolean): Boolean {
+        return try {
+            mPrefs.getBoolean(key, default)
+        } catch (_: ClassCastException) {
+            val raw = mPrefs.all[key]
+            when (raw) {
+                is Boolean -> raw
+                is Number -> raw.toInt() != 0
+                is String -> raw.toBooleanStrictOrNull() ?: default
+                else -> default
+            }
+        } catch (_: Throwable) {
+            default
+        }
+    }
+
+    private fun getSafeFloat(key: String, default: Float): Float {
+        return try {
+            mPrefs.getFloat(key, default)
+        } catch (_: ClassCastException) {
+            val raw = mPrefs.all[key]
+            when (raw) {
+                is Number -> raw.toFloat()
+                is String -> raw.toFloatOrNull() ?: default
+                else -> default
+            }
+        } catch (_: Throwable) {
+            default
+        }
+    }
 
     fun init(ctx: Context) {
         mPrefs = PreferenceManager.getDefaultSharedPreferences(ctx)
@@ -38,9 +119,13 @@ object Prefs {
         get() {
             val legacyMainsail = mPrefs.contains("mainsail")
             return if (legacyMainsail) {
-                if (mPrefs.getBoolean("mainsail", true)) FRONTEND_MAINSAIL else FRONTEND_FLUIDD
+                val migrated = if (getSafeBoolean("mainsail", true)) FRONTEND_MAINSAIL else FRONTEND_FLUIDD
+                try {
+                    mPrefs.edit().putString("web_frontend", migrated).remove("mainsail").apply()
+                } catch (_: Throwable) {}
+                migrated
             } else {
-                mPrefs.getString("web_frontend", FRONTEND_MAINSAIL) ?: FRONTEND_MAINSAIL
+                getSafeString("web_frontend", FRONTEND_MAINSAIL)
             }
         }
         set(value) {
@@ -49,7 +134,7 @@ object Prefs {
         }
 
     var engine: String
-        get() = mPrefs.getString("engine", ENGINE_KLIPPER) ?: ENGINE_KLIPPER
+        get() = getSafeString("engine", ENGINE_KLIPPER)
         set(value) {
             mPrefs.edit().putString("engine", value).apply()
             KlipperApp.EVENT_BUS.fireEvent(EngineChangedEvent())
@@ -59,27 +144,27 @@ object Prefs {
         get() = engine
 
     var appLanguage: String
-        get() = mPrefs.getString("app_language", LANGUAGE_SYSTEM) ?: LANGUAGE_SYSTEM
+        get() = getSafeString("app_language", LANGUAGE_SYSTEM)
         set(value) {
             mPrefs.edit().putString("app_language", value).apply()
         }
 
     val cameraWidth: Int
-        get() = mPrefs.getInt("camera_width", 1280)
+        get() = getSafeInt("camera_width", 1280)
 
     val cameraHeight: Int
-        get() = mPrefs.getInt("camera_height", 720)
+        get() = getSafeInt("camera_height", 720)
 
     val cameraId: String?
-        get() = mPrefs.getString("camera_id", null)
+        get() = getSafeStringNullable("camera_id")
 
     var isCameraEnabled: Boolean
         get() = (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || KlipperApp.INSTANCE.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) &&
-                mPrefs.getBoolean("camera_enabled", false)
+                getSafeBoolean("camera_enabled", false)
         set(value) { mPrefs.edit().putBoolean("camera_enabled", value).apply() }
 
     var usbDeviceNaming: Int
-        get() = mPrefs.getInt("usb_device_naming", USB_DEVICE_NAMING_BY_PATH)
+        get() = getSafeInt("usb_device_naming", USB_DEVICE_NAMING_BY_PATH)
         set(value) {
             UsbSerialManager.disconnectAll()
             mPrefs.edit().putInt("usb_device_naming", value).apply()
@@ -87,18 +172,18 @@ object Prefs {
         }
 
     var isFlashlightEnabled: Boolean
-        get() = mPrefs.getBoolean("flashlight", false)
+        get() = getSafeBoolean("flashlight", false)
         set(value) { mPrefs.edit().putBoolean("flashlight", value).apply() }
 
     var isAutofocusEnabled: Boolean
-        get() = mPrefs.getBoolean("autofocus", false)
+        get() = getSafeBoolean("autofocus", false)
         set(value) { mPrefs.edit().putBoolean("autofocus", value).apply() }
 
     var focusDistance: Float
-        get() = mPrefs.getFloat("focus", 0f)
+        get() = getSafeFloat("focus", 0f)
         set(value) { mPrefs.edit().putFloat("focus", value).apply() }
 
-    fun getLastCommit(): String? = mPrefs.getString("last_commit", null)
+    fun getLastCommit(): String? = getSafeStringNullable("last_commit")
 
     fun setLastCommit() {
         mPrefs.edit().putString("last_commit", BuildConfig.COMMIT).apply()

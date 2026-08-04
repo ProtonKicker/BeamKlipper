@@ -17,8 +17,4 @@
     <attr name="startStopButtonColor_9" format="color|reference"/>
     <attr name="startStopButtonForegroundColor" format="color|reference"/>
     <attr name="textColorDanger" format="color|reference"/>
-    <attr name="boostyColor" format="color|reference"/>
-    <attr name="telegramColor" format="color|reference"/>
-    <attr name="boostyColorTop" format="color|reference"/>
-    <attr name="boostyColorBottom" format="color|reference"/>
 </resources>

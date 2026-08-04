@@ -153,7 +153,10 @@ class KlipperInstanceView(context: Context) : LinearLayout(context) {
             val wm = KlipperApp.INSTANCE.getSystemService(Context.WIFI_SERVICE) as WifiManager
             val i = wm.connectionInfo.ipAddress
             val ip = if (i == 0 || !KlipperInstance.isWebServerRunning()) "127.0.0.1" else Formatter.formatIpAddress(i)
-            it.context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("http://$ip:${WebService.PORT}/")))
+            val t = System.currentTimeMillis()
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("http://$ip:${WebService.PORT}/?t=$t"))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            it.context.startActivity(intent)
         }
         isClickable = visible
         startStopButton.visibility = GONE

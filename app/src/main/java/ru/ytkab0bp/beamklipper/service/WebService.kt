@@ -53,7 +53,7 @@ import java.util.regex.Pattern
 
 class WebService : Service() {
     companion object {
-        const val PORT = 8888
+        const val PORT = 8889
         private const val ID = 300000
         private const val BEEPER_SAMPLE_RATE = 8000
         private val API_PATTERN = Pattern.compile("^/(printer|api|access|machine|server)/")
@@ -166,15 +166,24 @@ class WebService : Service() {
                     else -> "text/plain"
                 }
                 val prefix = Prefs.webFrontend
-                val input = ctx.assets.open(prefix + resolvedPath)
+                val assetPath = prefix + resolvedPath
+                val input = ctx.assets.open(assetPath)
                 val response = Response.newChunkedResponse(Status.OK, mimeType, input)
                 response.addHeader("Date", dateFormat.format(Date()))
                 response.addHeader("Last-Modified", lastModifiedString)
-                response.addHeader("Cache-Control", "max-age=604800")
+                if (resolvedPath.endsWith(".html") || resolvedPath.endsWith(".json")) {
+                    response.addHeader("Cache-Control", "no-cache, no-store, must-revalidate")
+                    response.addHeader("Pragma", "no-cache")
+                    response.addHeader("Expires", "0")
+                } else {
+                    response.addHeader("Cache-Control", "max-age=604800, immutable")
+                }
                 return response
             } catch (e: IOException) {
-                if (Prefs.webFrontend != Prefs.FRONTEND_FLUIDD) return serveStatic("/index.html")
-                return Response.newFixedLengthResponse(Status.NOT_FOUND, "text/plain", "Not Found")
+                if (path == "/index.html" || path == "/") {
+                    return Response.newFixedLengthResponse(Status.NOT_FOUND, "text/plain", "Not Found")
+                }
+                return serveStatic("/index.html")
             }
         }
 
