@@ -107,78 +107,6 @@ class InstanceEditorBottomSheet(
             marginStart = ViewUtils.dp(4)
         })
 
-        val iconsLabel = TextView(ctx).apply {
-            setText(R.string.SelectIcon)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-            setTextColor(ViewUtils.resolveColor(ctx, android.R.attr.textColorSecondary))
-            typeface = ViewUtils.getTypeface(ViewUtils.ROBOTO_MEDIUM)
-            letterSpacing = 0.06f
-            isAllCaps = true
-        }
-        root.addView(iconsLabel, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-            bottomMargin = ViewUtils.dp(12)
-            marginStart = ViewUtils.dp(4)
-        })
-
-        iconRecycler = RecyclerView(ctx).apply {
-            layoutManager = GridLayoutManager(ctx, 4)
-            overScrollMode = View.OVER_SCROLL_NEVER
-        }
-        val iconsList = InstanceIcon.values()
-        iconRecycler.adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
-            override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-                val card = MaterialCardView(ctx).apply {
-                    radius = ViewUtils.dp(18).toFloat()
-                    cardElevation = 0f
-                    setCardBackgroundColor(ViewUtils.resolveColor(ctx, R.attr.colorSurfaceContainerLow))
-                    layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(80)).apply {
-                        setMargins(ViewUtils.dp(5), ViewUtils.dp(5), ViewUtils.dp(5), ViewUtils.dp(5))
-                    }
-                    isCheckable = true
-                }
-                val frame = FrameLayout(ctx).apply {
-                    setPadding(ViewUtils.dp(8), ViewUtils.dp(8), ViewUtils.dp(8), ViewUtils.dp(8))
-                    background = ViewUtils.resolveDrawable(ctx, android.R.attr.selectableItemBackground)
-                }
-                val inner = LinearLayout(ctx).apply {
-                    orientation = LinearLayout.VERTICAL
-                    gravity = Gravity.CENTER
-                }
-                val iv = ImageView(ctx).apply {
-                    layoutParams = LinearLayout.LayoutParams(ViewUtils.dp(28), ViewUtils.dp(28))
-                    imageTintList = android.content.res.ColorStateList.valueOf(
-                        ViewUtils.resolveColor(ctx, android.R.attr.textColorPrimary)
-                    )
-                }
-                inner.addView(iv)
-                frame.addView(inner)
-                card.addView(frame)
-                return object : RecyclerView.ViewHolder(card) {}
-            }
-
-            override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-                val icon = iconsList[position]
-                val card = holder.itemView as MaterialCardView
-                (card.getChildAt(0) as FrameLayout).let { fl ->
-                    ((fl.getChildAt(0) as LinearLayout).getChildAt(0) as ImageView).setImageResource(icon.drawable)
-                }
-                card.isChecked = selectedIcon == icon
-                card.strokeWidth = if (selectedIcon == icon) ViewUtils.dp(2) else 0
-                if (selectedIcon == icon) {
-                    card.setStrokeColor(android.content.res.ColorStateList.valueOf(ViewUtils.resolveColor(ctx, R.attr.colorPrimary)))
-                }
-                card.setOnClickListener {
-                    selectedIcon = icon
-                    notifyItemRangeChanged(0, itemCount)
-                }
-            }
-
-            override fun getItemCount(): Int = iconsList.size
-        }
-        root.addView(iconRecycler, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-            bottomMargin = ViewUtils.dp(28)
-        })
-
         val nameLabel = TextView(ctx).apply {
             setText(R.string.InstanceName)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
@@ -205,7 +133,7 @@ class InstanceEditorBottomSheet(
             setHintTextColor(ViewUtils.resolveColor(ctx, android.R.attr.textColorSecondary))
             setPadding(ViewUtils.dp(16), 0, ViewUtils.dp(16), 0)
             background = null
-            hint = "e.g. Voron 2.4"
+            hint = "e.g. Printer 1"
             gravity = Gravity.START or Gravity.CENTER_VERTICAL
             setSelection(text.length)
         }
@@ -307,6 +235,77 @@ class InstanceEditorBottomSheet(
         }
         root.addView(editOpenDir)
 
+        val iconsLabel = TextView(ctx).apply {
+            setText(R.string.SelectIcon)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setTextColor(ViewUtils.resolveColor(ctx, android.R.attr.textColorSecondary))
+            typeface = ViewUtils.getTypeface(ViewUtils.ROBOTO_MEDIUM)
+            letterSpacing = 0.06f
+        }
+        root.addView(iconsLabel, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            bottomMargin = ViewUtils.dp(12)
+            marginStart = ViewUtils.dp(4)
+        })
+
+        iconRecycler = RecyclerView(ctx).apply {
+            layoutManager = GridLayoutManager(ctx, 4)
+            overScrollMode = View.OVER_SCROLL_NEVER
+        }
+        val iconsList = InstanceIcon.values()
+        iconRecycler.adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+            override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+                val card = MaterialCardView(ctx).apply {
+                    radius = ViewUtils.dp(18).toFloat()
+                    cardElevation = 0f
+                    setCardBackgroundColor(ViewUtils.resolveColor(ctx, R.attr.colorSurfaceContainerLow))
+                    layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(80)).apply {
+                        setMargins(ViewUtils.dp(5), ViewUtils.dp(5), ViewUtils.dp(5), ViewUtils.dp(5))
+                    }
+                    isCheckable = true
+                }
+                val frame = FrameLayout(ctx).apply {
+                    setPadding(ViewUtils.dp(8), ViewUtils.dp(8), ViewUtils.dp(8), ViewUtils.dp(8))
+                    background = ViewUtils.resolveDrawable(ctx, android.R.attr.selectableItemBackground)
+                }
+                val inner = LinearLayout(ctx).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = Gravity.CENTER
+                }
+                val iv = ImageView(ctx).apply {
+                    layoutParams = LinearLayout.LayoutParams(ViewUtils.dp(28), ViewUtils.dp(28))
+                    imageTintList = android.content.res.ColorStateList.valueOf(
+                        ViewUtils.resolveColor(ctx, android.R.attr.textColorPrimary)
+                    )
+                }
+                inner.addView(iv)
+                frame.addView(inner)
+                card.addView(frame)
+                return object : RecyclerView.ViewHolder(card) {}
+            }
+
+            override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+                val icon = iconsList[position]
+                val card = holder.itemView as MaterialCardView
+                (card.getChildAt(0) as FrameLayout).let { fl ->
+                    ((fl.getChildAt(0) as LinearLayout).getChildAt(0) as ImageView).setImageResource(icon.drawable)
+                }
+                card.isChecked = selectedIcon == icon
+                card.strokeWidth = if (selectedIcon == icon) ViewUtils.dp(2) else 0
+                if (selectedIcon == icon) {
+                    card.setStrokeColor(android.content.res.ColorStateList.valueOf(ViewUtils.resolveColor(ctx, R.attr.colorPrimary)))
+                }
+                card.setOnClickListener {
+                    selectedIcon = icon
+                    notifyItemRangeChanged(0, itemCount)
+                }
+            }
+
+            override fun getItemCount(): Int = iconsList.size
+        }
+        root.addView(iconRecycler, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            bottomMargin = ViewUtils.dp(28)
+        })
+
         autostartSwitch = PreferenceSwitchView(ctx).apply {
             layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(56)).apply {
                 topMargin = ViewUtils.dp(8)
@@ -342,7 +341,16 @@ class InstanceEditorBottomSheet(
     private fun saveAndDismiss() {
         var nameStr = nameEdit.text?.toString()?.trim() ?: ""
         if (TextUtils.isEmpty(nameStr)) {
-            nameStr = "Printer"
+            val instances = KlipperInstance.getInstances()
+            var counter = 1
+            while (true) {
+                val candidate = "Printer " + counter
+                if (instances.none { it.name == candidate }) {
+                    nameStr = candidate
+                    break
+                }
+                counter++
+            }
         }
 
         if (editInstance != null) {
