@@ -156,8 +156,6 @@ class MainActivity : AppCompatActivity() {
             clipChildren = false
             clipToPadding = false
         }
-        mainPage.addView(badgesLayout, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-
         gearBtn = buildTopTile(R.drawable.ic_settings_outline_28).apply {
             setOnClickListener { homeView.animateTo(HomeView.PAGE_SETTINGS) }
         }
@@ -264,7 +262,7 @@ class MainActivity : AppCompatActivity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
-        val gap = ViewUtils.dp(20)
+        val gap = ViewUtils.dp(40)
 
         addButton = buildBigCreamButton(R.drawable.ic_add_outline_28).apply {
             setOnClickListener { InstanceEditorBottomSheet.show(this@MainActivity, null) }
@@ -291,6 +289,8 @@ class MainActivity : AppCompatActivity() {
             rightMargin = ViewUtils.dp(24)
             bottomMargin = ViewUtils.dp(60)
         })
+
+        mainPage.addView(badgesLayout, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
 
         mainPage.setOnApplyWindowInsetsListener { _, insets ->
             badgesLayout.setPadding(insets.systemWindowInsetLeft, insets.systemWindowInsetTop, insets.systemWindowInsetRight, 0)

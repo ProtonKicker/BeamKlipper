@@ -233,6 +233,10 @@ class InstanceEditorBottomSheet(
                 layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(56)).apply {
                     bottomMargin = ViewUtils.dp(8)
                 }
+            }
+            configCard = cCard
+            val configInner = FrameLayout(ctx).apply {
+                setPadding(ViewUtils.dp(16), 0, ViewUtils.dp(12), 0)
                 background = ViewUtils.resolveDrawable(ctx, android.R.attr.selectableItemBackground)
                 setOnClickListener {
                     if (filesList.isNotEmpty()) {
@@ -246,10 +250,6 @@ class InstanceEditorBottomSheet(
                             .show()
                     }
                 }
-            }
-            configCard = cCard
-            val configInner = FrameLayout(ctx).apply {
-                setPadding(ViewUtils.dp(16), 0, ViewUtils.dp(12), 0)
             }
             val emptyHint = ctx.getString(R.string.InstanceConfigHint)
             val cValue = TextView(ctx).apply {
