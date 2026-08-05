@@ -7,9 +7,15 @@ import ru.ytkab0bp.beamklipper.utils.ViewUtils
 
 class PreferenceHeaderView(context: Context) : AppCompatTextView(context) {
     init {
-        setPadding(ViewUtils.dp(21), ViewUtils.dp(6), ViewUtils.dp(21), 0)
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+        setPadding(ViewUtils.dp(24), ViewUtils.dp(24), ViewUtils.dp(24), ViewUtils.dp(10))
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
         typeface = ViewUtils.getTypeface(ViewUtils.ROBOTO_MEDIUM)
-        setTextColor(ViewUtils.resolveColor(context, android.R.attr.colorPrimary))
+        letterSpacing = 0.12f
+        isAllCaps = true
+        setTextColor(0xFF000000.toInt())
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
     }
 }

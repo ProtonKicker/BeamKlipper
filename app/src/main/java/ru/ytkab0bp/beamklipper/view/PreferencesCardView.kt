@@ -3,10 +3,8 @@ package ru.ytkab0bp.beamklipper.view
 import android.Manifest
 import android.app.Activity
 import android.content.Context
-import android.content.DialogInterface
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.content.res.Configuration
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -18,18 +16,18 @@ import android.os.Build
 import android.provider.Settings
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
-import android.view.Window
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import ru.ytkab0bp.beamklipper.*
 import ru.ytkab0bp.beamklipper.serial.KlipperProbeTable
@@ -46,6 +44,7 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
         private const val VIEW_TYPE_SWITCH = 1
         private const val VIEW_TYPE_PREFERENCE = 2
         private const val VIEW_TYPE_PREF_VALUE = 3
+        private const val VIEW_TYPE_SEGMENT_CHOICE = 5
     }
 
     private val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -61,16 +60,19 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
     private var itemsCount = 0
     private var generalHeaderRow = 0
     private var systemSettingsRow = 0
+    private var cameraHeaderRow = 0
+    private var cameraEnabledRow = 0
     private var frontendRow = 0
     private var firmwareRow = 0
     private var languageRow = 0
-    private var cameraHeaderRow = 0
-    private var cameraEnabledRow = 0
     private var usbHeaderRow = 0
     private var usbNamingRow = 0
     private var listUsbRow = 0
     private var otherHeaderRow = 0
     private var getMCUFirmwareRow = 0
+    private var doneButtonRow = 0
+
+    private val doneButton: MaterialCardView
 
     init {
         dimmPaint.color = Color.BLACK
@@ -106,25 +108,30 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
 
         title = TextView(context).apply {
             setText(R.string.Settings)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 24f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 28f)
             setTextColor(ViewUtils.resolveColor(context, android.R.attr.textColorPrimary))
             typeface = ViewUtils.getTypeface(ViewUtils.ROBOTO_MEDIUM)
-            gravity = Gravity.CENTER
+            gravity = Gravity.START or Gravity.CENTER_VERTICAL
         }
-        header.addView(title, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        ll.addView(header, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(64)))
+        header.addView(title, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+            marginStart = ViewUtils.dp(4)
+        })
+        ll.addView(header, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(72)))
 
         updateRows()
         listView = RecyclerView(context).apply {
             layoutManager = LinearLayoutManager(context)
+            clipToPadding = false
+            setPadding(0, 0, 0, ViewUtils.dp(140))
         }
         adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-                val v: android.view.View = when (viewType) {
+                val v: View = when (viewType) {
                     VIEW_TYPE_HEADER -> PreferenceHeaderView(context)
                     VIEW_TYPE_SWITCH -> PreferenceSwitchView(context)
                     VIEW_TYPE_PREFERENCE -> PreferenceView(context)
                     VIEW_TYPE_PREF_VALUE -> PreferenceValueView(context)
+                    VIEW_TYPE_SEGMENT_CHOICE -> SegmentChoiceView(context)
                     else -> PreferenceHeaderView(context)
                 }
                 return object : RecyclerView.ViewHolder(v) {}
@@ -136,9 +143,9 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
                         val h = holder.itemView as PreferenceHeaderView
                         h.setText(
                             when (position) {
-                                cameraHeaderRow -> R.string.Camera
                                 usbHeaderRow -> R.string.USB
                                 generalHeaderRow -> R.string.General
+                                cameraHeaderRow -> R.string.Camera
                                 otherHeaderRow -> R.string.Other
                                 else -> 0
                             }
@@ -147,7 +154,12 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
                     VIEW_TYPE_SWITCH -> {
                         val sw = holder.itemView as PreferenceSwitchView
                         if (position == cameraEnabledRow) {
-                            sw.bind(context.getString(R.string.EnableCamera), null, Prefs.isCameraEnabled)
+                            sw.bind(
+                                context.getString(R.string.EnableCamera),
+                                context.getString(R.string.CameraDescription),
+                                Prefs.isCameraEnabled,
+                                R.drawable.ic_camera_outline_24
+                            )
                             sw.setOnClickListener { v ->
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
                                     ContextCompat.checkSelfPermission(v.context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
@@ -155,9 +167,9 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
                                     ActivityCompat.requestPermissions(context as Activity, arrayOf(Manifest.permission.CAMERA), 0)
                                     return@setOnClickListener
                                 }
-                                sw.isChecked = !sw.isChecked
-                                Prefs.isCameraEnabled = sw.isChecked
-                                KlipperInstance.onCameraConfigChanged(sw.isChecked)
+                                sw.checked = !sw.checked
+                                Prefs.isCameraEnabled = sw.checked
+                                KlipperInstance.onCameraConfigChanged(sw.checked)
                             }
                         }
                     }
@@ -165,7 +177,11 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
                         val pref = holder.itemView as PreferenceView
                         when (position) {
                             listUsbRow -> {
-                                pref.bind(context.getString(R.string.ListUSB), null)
+                                pref.bind(
+                                    context.getString(R.string.ListUSB),
+                                    "Show all connected USB-to-serial adapters",
+                                    R.drawable.ic_usb_outline_24
+                                )
                                 pref.setOnClickListener {
                                     val manager = context.getSystemService(Context.USB_SERVICE) as UsbManager
                                     val list = mutableListOf<String>()
@@ -175,7 +191,7 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
                                             Integer.toHexString(dev.vendorId) + "/" + Integer.toHexString(dev.productId) +
                                                     " - " + dev.deviceName +
                                                     (if (drv != null) " - " + drv.name + "\n" +
-                                                    File(KlipperApp.INSTANCE.filesDir, "serial/" + UsbSerialManager.getUID(dev)).absolutePath else "")
+                                                            File(KlipperApp.INSTANCE.filesDir, "serial/" + UsbSerialManager.getUID(dev)).absolutePath else "")
                                         )
                                     }
                                     val b = MaterialAlertDialogBuilder(context).setTitle(R.string.ListUSBTitle)
@@ -188,132 +204,133 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
                                 }
                             }
                             systemSettingsRow -> {
-                                pref.bind(context.getString(R.string.SystemSettings), null)
+                                pref.bind(
+                                    context.getString(R.string.SystemSettings),
+                                    "Open Android system settings",
+                                    R.drawable.ic_settings_outline_24
+                                )
                                 pref.setOnClickListener {
                                     context.startActivity(Intent(Settings.ACTION_SETTINGS))
                                 }
                             }
                             getMCUFirmwareRow -> {
-                                pref.bind(context.getString(R.string.OtherGetFirmware), null)
+                                pref.bind(
+                                    context.getString(R.string.OtherGetFirmware),
+                                    "Pre-built Klipper firmware for MCUs",
+                                    R.drawable.ic_chip_outline_24
+                                )
                                 pref.setOnClickListener {
                                     QRCodeAlertDialog(context, "https://github.com/utkabobr/klipper/releases/tag/prebuilt-v0.12.0").show()
                                 }
                             }
                         }
                     }
-                    VIEW_TYPE_PREF_VALUE -> {
-                        val v = holder.itemView as PreferenceValueView
+                    VIEW_TYPE_SEGMENT_CHOICE -> {
+                        val seg = holder.itemView as SegmentChoiceView
                         when (position) {
-                            usbNamingRow -> {
-                                v.bind(
-                                    KlipperApp.INSTANCE.getString(R.string.USBDeviceNaming),
-                                    KlipperApp.INSTANCE.getString(
-                                        if (Prefs.usbDeviceNaming == Prefs.USB_DEVICE_NAMING_BY_PATH) R.string.USBDeviceNamingByPath
-                                        else R.string.USBDeviceNamingByVidPid
-                                    )
-                                )
-                                v.setOnClickListener {
-                                    MaterialAlertDialogBuilder(it.context)
-                                        .setTitle(R.string.USBDeviceNaming)
-                                        .setItems(arrayOf(
-                                            KlipperApp.INSTANCE.getString(R.string.USBDeviceNamingByPath),
-                                            KlipperApp.INSTANCE.getString(R.string.USBDeviceNamingByVidPid)
-                                        ), DialogInterface.OnClickListener { dialog, which ->
-                                            Prefs.usbDeviceNaming = which
-                                            adapter.notifyItemChanged(holder.adapterPosition)
-                                        })
-                                        .show()
-                                }
-                            }
                             frontendRow -> {
-                                v.bind(
-                                    KlipperApp.INSTANCE.getString(R.string.WebFrontend),
-                                    frontendTitle(Prefs.webFrontend)
-                                )
-                                v.setOnClickListener {
-                                    MaterialAlertDialogBuilder(it.context)
-                                        .setTitle(R.string.WebFrontend)
-                                        .setItems(arrayOf(
-                                            KlipperApp.INSTANCE.getString(R.string.Fluidd),
-                                            KlipperApp.INSTANCE.getString(R.string.Mainsail)
-                                        ), DialogInterface.OnClickListener { dialog, which ->
-                                            Prefs.webFrontend = when (which) {
-                                                0 -> Prefs.FRONTEND_FLUIDD
-                                                else -> Prefs.FRONTEND_MAINSAIL
-                                            }
-                                            adapter.notifyItemChanged(holder.adapterPosition)
-                                        })
-                                        .show()
+                                seg.bind(
+                                    title = context.getString(R.string.WebFrontend),
+                                    subtitle = "Locally-hosted control interface for Klipper",
+                                    options = listOf(
+                                        context.getString(R.string.Fluidd),
+                                        context.getString(R.string.Mainsail)
+                                    ),
+                                    value = frontendTitle(Prefs.webFrontend),
+                                    icon = R.drawable.ic_globe_outline_28,
+                                    optionIcons = listOf(
+                                        R.drawable.ic_globe_outline_28,
+                                        R.drawable.ic_grid_layout_outline_28
+                                    )
+                                ) { selected, idx ->
+                                    Prefs.webFrontend = when (idx) {
+                                        0 -> Prefs.FRONTEND_FLUIDD
+                                        else -> Prefs.FRONTEND_MAINSAIL
+                                    }
                                 }
                             }
                             firmwareRow -> {
-                                v.bind(
-                                    KlipperApp.INSTANCE.getString(R.string.FirmwareEngine),
-                                    firmwareTitle(Prefs.engine)
-                                )
-                                v.setOnClickListener {
-                                    MaterialAlertDialogBuilder(it.context)
-                                        .setTitle(R.string.FirmwareEngine)
-                                        .setItems(
-                                            arrayOf(
-                                                KlipperApp.INSTANCE.getString(R.string.Klipper),
-                                                KlipperApp.INSTANCE.getString(R.string.Kalico)
-                                            )
-                                        ) { _, which ->
-                                            val engine = if (which == 0) Prefs.ENGINE_KLIPPER else Prefs.ENGINE_KALICO
-                                            if (engine == Prefs.ENGINE_KALICO &&
-                                                !File(KlipperApp.INSTANCE.filesDir, "kalico/klippy/klippy.py").exists()
-                                            ) {
-                                                MaterialAlertDialogBuilder(it.context)
-                                                    .setTitle(R.string.Error)
-                                                    .setMessage(R.string.EngineNotBundled)
-                                                    .setPositiveButton(android.R.string.ok, null)
-                                                    .show()
-                                                return@setItems
-                                            }
-
-                                            Prefs.engine = engine
-                                            adapter.notifyItemChanged(holder.adapterPosition)
-                                            if (KlipperInstance.getInstances().any { inst -> inst.getState() == KlipperInstance.State.RUNNING }) {
-                                                MaterialAlertDialogBuilder(it.context)
-                                                    .setTitle(R.string.FirmwareEngine)
-                                                    .setMessage(R.string.EngineRestartRequired)
-                                                    .setPositiveButton(android.R.string.ok, null)
-                                                    .show()
-                                            }
-                                        }
-                                        .show()
+                                val klipperExists = File(KlipperApp.INSTANCE.filesDir, "klipper/klippy/klippy.py").exists()
+                                val kalicoExists = File(KlipperApp.INSTANCE.filesDir, "kalico/klippy/klippy.py").exists()
+                                seg.bind(
+                                    title = context.getString(R.string.FirmwareEngine),
+                                    subtitle = "Print engine backend that runs G-code",
+                                    options = listOf(
+                                        context.getString(R.string.Klipper),
+                                        context.getString(R.string.Kalico)
+                                    ),
+                                    value = firmwareTitle(Prefs.engine),
+                                    icon = R.drawable.ic_printer_outline_28,
+                                    optionIcons = listOf(
+                                        R.drawable.ic_printer_outline_28,
+                                        R.drawable.ic_brain_outline_28
+                                    )
+                                ) { selected, idx ->
+                                    val engine = if (idx == 0) Prefs.ENGINE_KLIPPER else Prefs.ENGINE_KALICO
+                                    if (engine == Prefs.ENGINE_KALICO && !kalicoExists) {
+                                        MaterialAlertDialogBuilder(context)
+                                            .setTitle(R.string.Error)
+                                            .setMessage(R.string.EngineNotBundled)
+                                            .setPositiveButton(android.R.string.ok, null)
+                                            .show()
+                                        seg.post { adapter.notifyItemChanged(holder.adapterPosition) }
+                                        return@bind
+                                    }
+                                    Prefs.engine = engine
+                                    if (KlipperInstance.getInstances().any { inst -> inst.getState() == KlipperInstance.State.RUNNING }) {
+                                        MaterialAlertDialogBuilder(context)
+                                            .setTitle(R.string.FirmwareEngine)
+                                            .setMessage(R.string.EngineRestartRequired)
+                                            .setPositiveButton(android.R.string.ok, null)
+                                            .show()
+                                    }
                                 }
                             }
                             languageRow -> {
-                                v.bind(
-                                    KlipperApp.INSTANCE.getString(R.string.AppLanguage),
-                                    languageTitle(Prefs.appLanguage)
-                                )
-                                v.setOnClickListener {
-                                    MaterialAlertDialogBuilder(it.context)
-                                        .setTitle(R.string.AppLanguage)
-                                        .setItems(
-                                            arrayOf(
-                                                KlipperApp.INSTANCE.getString(R.string.LanguageSystem),
-                                                KlipperApp.INSTANCE.getString(R.string.LanguageEnglish),
-                                                KlipperApp.INSTANCE.getString(R.string.LanguageRussian),
-                                                KlipperApp.INSTANCE.getString(R.string.LanguageChineseSimplified),
-                                                KlipperApp.INSTANCE.getString(R.string.LanguageChineseTraditional)
-                                            )
-                                        ) { _, which ->
-                                            Prefs.appLanguage = when (which) {
-                                                0 -> Prefs.LANGUAGE_SYSTEM
-                                                1 -> Prefs.LANGUAGE_ENGLISH
-                                                2 -> Prefs.LANGUAGE_RUSSIAN
-                                                3 -> Prefs.LANGUAGE_CHINESE_SIMPLIFIED
-                                                else -> Prefs.LANGUAGE_CHINESE_TRADITIONAL
-                                            }
-                                            Prefs.applyAppLanguage()
-                                            adapter.notifyItemChanged(holder.adapterPosition)
-                                            (it.context as? AppCompatActivity)?.recreate()
-                                        }
-                                        .show()
+                                seg.bind(
+                                    title = context.getString(R.string.AppLanguage),
+                                    subtitle = "Display language for the app",
+                                    options = listOf(
+                                        context.getString(R.string.LanguageSystem),
+                                        context.getString(R.string.LanguageEnglish),
+                                        context.getString(R.string.LanguageRussian),
+                                        context.getString(R.string.LanguageChineseSimplified),
+                                        context.getString(R.string.LanguageChineseTraditional)
+                                    ),
+                                    value = languageTitle(Prefs.appLanguage),
+                                    icon = R.drawable.ic_language_outline_24,
+                                    optionIcons = emptyList()
+                                ) { selected, idx ->
+                                    Prefs.appLanguage = when (idx) {
+                                        0 -> Prefs.LANGUAGE_SYSTEM
+                                        1 -> Prefs.LANGUAGE_ENGLISH
+                                        2 -> Prefs.LANGUAGE_RUSSIAN
+                                        3 -> Prefs.LANGUAGE_CHINESE_SIMPLIFIED
+                                        else -> Prefs.LANGUAGE_CHINESE_TRADITIONAL
+                                    }
+                                    Prefs.applyAppLanguage()
+                                    (context as? AppCompatActivity)?.recreate()
+                                }
+                            }
+                            usbNamingRow -> {
+                                seg.bind(
+                                    title = context.getString(R.string.USBDeviceNaming),
+                                    subtitle = "By path (/dev/ttyUSB0) recommended",
+                                    options = listOf(
+                                        context.getString(R.string.USBDeviceNamingByPath),
+                                        context.getString(R.string.USBDeviceNamingByVidPid)
+                                    ),
+                                    value = if (Prefs.usbDeviceNaming == Prefs.USB_DEVICE_NAMING_BY_PATH)
+                                        context.getString(R.string.USBDeviceNamingByPath)
+                                    else
+                                        context.getString(R.string.USBDeviceNamingByVidPid),
+                                    icon = R.drawable.ic_usb_outline_24,
+                                    optionIcons = listOf(
+                                        R.drawable.ic_external_link_outline_24,
+                                        R.drawable.ic_info_outline_24
+                                    )
+                                ) { _, idx ->
+                                    Prefs.usbDeviceNaming = idx
                                 }
                             }
                         }
@@ -326,16 +343,60 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
             override fun getItemViewType(position: Int): Int {
                 return when (position) {
                     cameraEnabledRow -> VIEW_TYPE_SWITCH
-                    cameraHeaderRow, usbHeaderRow, generalHeaderRow, otherHeaderRow -> VIEW_TYPE_HEADER
+                    generalHeaderRow, cameraHeaderRow, usbHeaderRow, otherHeaderRow -> VIEW_TYPE_HEADER
                     listUsbRow, systemSettingsRow, getMCUFirmwareRow -> VIEW_TYPE_PREFERENCE
-                    usbNamingRow, frontendRow, firmwareRow, languageRow -> VIEW_TYPE_PREF_VALUE
+                    frontendRow, firmwareRow, languageRow, usbNamingRow -> VIEW_TYPE_SEGMENT_CHOICE
                     else -> 0
                 }
             }
         }
         listView.adapter = adapter
         ll.addView(listView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+
+        doneButton = MaterialCardView(context).apply {
+            radius = ViewUtils.dp(14f).toFloat()
+            cardElevation = 0f
+            strokeWidth = ViewUtils.dp(1)
+            strokeColor = 0x00000000
+            isClickable = true
+            isFocusable = true
+            setCardBackgroundColor(0xFF000000.toInt())
+            val content = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+                minimumHeight = ViewUtils.dp(56)
+            }
+            val doneTv = TextView(context).apply {
+                text = "Done"
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                typeface = ViewUtils.getTypeface(ViewUtils.ROBOTO_MEDIUM)
+                setTextColor(-0x1)
+                isAllCaps = true
+                letterSpacing = 0.08f
+                setPadding(ViewUtils.dp(20), ViewUtils.dp(4), ViewUtils.dp(20), ViewUtils.dp(4))
+            }
+            content.addView(doneTv)
+            addView(content, LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            foreground = ViewUtils.resolveDrawable(context, androidx.appcompat.R.attr.selectableItemBackground)
+            ViewUtils.applyPressFeel(this, 0.98f, 4f)
+            setOnClickListener {
+                if (context is MainActivity) {
+                    context.closePreferences()
+                }
+            }
+        }
+        val doneLP = FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply {
+            leftMargin = ViewUtils.dp(20)
+            rightMargin = ViewUtils.dp(20)
+            bottomMargin = ViewUtils.dp(28)
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+        }
+
         addView(ll, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        addView(doneButton, doneLP)
 
         setWillNotDraw(false)
         fitsSystemWindows = true
@@ -431,11 +492,16 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
     }
 
     private fun invalidateProgress() {
-        title.scaleX = ViewUtils.lerp(1f, 0.5f, progress)
-        title.scaleY = ViewUtils.lerp(1f, 0.5f, progress)
+        title.scaleX = ViewUtils.lerp(1f, 0.92f, progress)
+        title.scaleY = ViewUtils.lerp(1f, 0.92f, progress)
+        title.translationX = ViewUtils.lerp(0f, ViewUtils.dp(8).toFloat(), progress)
         header.alpha = 1f - progress
         header.invalidate()
         listView.alpha = progress
+        doneButton.alpha = progress
+        doneButton.scaleX = ViewUtils.lerp(0.94f, 1f, progress)
+        doneButton.scaleY = ViewUtils.lerp(0.94f, 1f, progress)
+        doneButton.translationY = ViewUtils.lerp(ViewUtils.dp(24).toFloat(), 0f, progress)
         for (i in 0 until childCount) {
             getChildAt(i).translationY = ViewUtils.lerp(
                 height - ViewUtils.dp(MIN_HEIGHT_DP) - paddingTop - paddingBottom.toFloat(), 0f, progress

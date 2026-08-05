@@ -1,28 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="AppTheme" parent="@style/Theme.Material3.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/beam_lavender_primary</item>
-        <item name="colorOnPrimary">@color/beam_lavender_on_primary</item>
-        <item name="colorPrimaryContainer">@color/beam_lavender_primary_container</item>
-        <item name="colorOnPrimaryContainer">@color/beam_lavender_on_primary_container</item>
-        <item name="cardOutlineColor">?attr/colorSurfaceContainer</item>
-        <item name="android:windowBackground">?attr/colorSurface</item>
-        <item name="dividerColor">?attr/colorOutlineVariant</item>
-        <item name="navbarColor">?attr/colorSurface</item>
+        <item name="colorPrimary">@color/beam_black_primary</item>
+        <item name="colorOnPrimary">@color/beam_white</item>
+        <item name="colorPrimaryContainer">@color/beam_ink_100</item>
+        <item name="colorOnPrimaryContainer">@color/beam_black_primary</item>
+        <item name="colorSurfaceContainerLow">@color/beam_row_white</item>
+        <item name="colorSurfaceContainerHigh">@color/beam_ink_100</item>
+        <item name="cardOutlineColor">@color/dividerColor</item>
+        <item name="android:windowBackground">@color/windowBackground</item>
+        <item name="dividerColor">@color/dividerColor</item>
+        <item name="navbarColor">@color/windowBackground</item>
         <item name="android:colorAccent">?attr/colorPrimary</item>
         <item name="textColorOnAccent">?attr/colorOnPrimary</item>
         <item name="dialogBackground">?attr/colorSurfaceContainerHigh</item>
-        <item name="startStopButtonForegroundColor">?attr/colorOnSurface</item>
-        <item name="startStopButtonColor_0">@color/beam_lavender_primary_container</item>
-        <item name="startStopButtonColor_1">#E5DDFF</item>
-        <item name="startStopButtonColor_2">#D7F3EE</item>
-        <item name="startStopButtonColor_3">#DCE7FF</item>
-        <item name="startStopButtonColor_4">#E9F6D6</item>
-        <item name="startStopButtonColor_5">#D8F4E6</item>
-        <item name="startStopButtonColor_6">#FFE0E2</item>
-        <item name="startStopButtonColor_7">#FFE1F0</item>
-        <item name="startStopButtonColor_8">#F0E0FF</item>
-        <item name="startStopButtonColor_9">#E0EAFF</item>
-        <item name="textColorDanger">#e12336</item>
+        <item name="startStopButtonForegroundColor">@color/beam_black_primary</item>
+        <item name="startStopButtonColor_0">@color/beam_white</item>
+        <item name="startStopButtonColor_1">@color/beam_white</item>
+        <item name="startStopButtonColor_2">@color/beam_white</item>
+        <item name="startStopButtonColor_3">@color/beam_white</item>
+        <item name="startStopButtonColor_4">@color/beam_white</item>
+        <item name="startStopButtonColor_5">@color/beam_white</item>
+        <item name="startStopButtonColor_6">@color/beam_white</item>
+        <item name="startStopButtonColor_7">@color/beam_white</item>
+        <item name="startStopButtonColor_8">@color/beam_white</item>
+        <item name="startStopButtonColor_9">@color/beam_white</item>
+        <item name="textColorDanger">#000000</item>
     </style>
 </resources>

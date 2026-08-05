@@ -5,6 +5,10 @@
     <attr name="navbarColor" format="color|reference" />
     <attr name="textColorOnAccent" format="color|reference"/>
     <attr name="dialogBackground" format="color|reference"/>
+    <attr name="colorSurfaceContainerLow" format="color|reference"/>
+    <attr name="colorSurfaceContainerHigh" format="color|reference"/>
+    <attr name="colorPrimaryContainer" format="color|reference"/>
+    <attr name="colorOnPrimaryContainer" format="color|reference"/>
     <attr name="startStopButtonColor_0" format="color|reference"/>
     <attr name="startStopButtonColor_1" format="color|reference"/>
     <attr name="startStopButtonColor_2" format="color|reference"/>

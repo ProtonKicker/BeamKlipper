@@ -66,10 +66,13 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val REQUEST_NOTIFICATIONS = 100
         private const val VIEW_TYPE_HEADER = 0
-        private const val VIEW_TYPE_INSTANCE = 1
+        private const val VIEW_TYPE_SECTION = 1
+        private const val VIEW_TYPE_EMPTY = 2
+        private const val VIEW_TYPE_INSTANCE = 3
         private val NOTIFY_LIVE = Any()
     }
 
+    private lateinit var fl: FrameLayout
     private lateinit var homeView: HomeView
     private lateinit var listCardView: MaterialCardView
     private lateinit var resizeFrame: SmoothResizeFrameLayout
@@ -83,15 +86,25 @@ class MainActivity : AppCompatActivity() {
     private lateinit var newOrEditLayout: LinearLayout
     private lateinit var newOrEditTitle: TextView
     private var editInstance: KlipperInstance? = null
-    private lateinit var nameRow: EditTextRowView
-    private lateinit var configRow: EditTextRowView
-    private lateinit var editOpenDirectoryRow: TextView
-    private lateinit var autostartRow: PreferenceSwitchView
-    private lateinit var newOrEditContinue: TextView
+    private lateinit var newOrEditContinue: com.google.android.material.card.MaterialCardView
+    private lateinit var newOrEditNameEt: EditText
+    private lateinit var configPillLabel: TextView
+    private lateinit var configPillRow: com.google.android.material.card.MaterialCardView
+    private var selectedIconOrdinal: Int = 0
+    private lateinit var iconTiles: Array<com.google.android.material.card.MaterialCardView>
+    private lateinit var tileOrdinals: IntArray
+    private lateinit var autostartTitle: TextView
+    private lateinit var autostartSubtitle: TextView
+    private lateinit var autostartSwitch: com.google.android.material.switchmaterial.SwitchMaterial
+    private lateinit var editFolderTitle: TextView
+    private lateinit var editFolderSubtitle: TextView
+    private lateinit var editFolderRow: com.google.android.material.card.MaterialCardView
+    private lateinit var fab: MaterialCardView
 
     private lateinit var preferencesView: PreferencesCardView
 
     private lateinit var noPermsLayout: MaterialCardView
+    private var responsiveLayoutToken: Int = -1
     private lateinit var batteryRow: PermissionRowView
     private var notificationsRow: PermissionRowView? = null
     private var hideServicesChannelRow: PermissionRowView? = null
@@ -127,8 +140,7 @@ class MainActivity : AppCompatActivity() {
         }
         isCurrentLauncher = intent?.categories?.contains(Intent.CATEGORY_HOME) == true
 
-        val fl = FrameLayout(this)
-
+        fl = FrameLayout(this)
         homeView = HomeView(this)
 
         badgesLayout = object : FrameLayout(this) {
@@ -181,14 +193,10 @@ class MainActivity : AppCompatActivity() {
 
         listCardView = MaterialCardView(this).apply {
             setStrokeColor(0)
-            setCardBackgroundColor(
-                ViewUtils.resolveColor(
-                    this@MainActivity,
-                    com.google.android.material.R.attr.colorSurfaceContainerLow
-                )
-            )
-            cardElevation = ViewUtils.dp(1).toFloat()
-            radius = ViewUtils.dp(32).toFloat()
+            setCardBackgroundColor(0x00000000)
+            cardElevation = 0f
+            radius = 0f
+            strokeWidth = 0
         }
 
         preferencesView = PreferencesCardView(this).apply {
@@ -205,6 +213,8 @@ class MainActivity : AppCompatActivity() {
         }
         homeView.setScrollView(listView)
         instancesAdapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+            private fun instanceOffset(): Int = if (visibleInstances.isEmpty()) 2 else 2
+
             override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
                 val v: View = when (viewType) {
                     VIEW_TYPE_HEADER -> {
@@ -212,6 +222,8 @@ class MainActivity : AppCompatActivity() {
                             layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
                         }
                     }
+                    VIEW_TYPE_SECTION -> SectionHeaderView(this@MainActivity)
+                    VIEW_TYPE_EMPTY -> EmptyStateView(this@MainActivity)
                     VIEW_TYPE_INSTANCE -> KlipperInstanceView(this@MainActivity)
                     else -> throw IllegalStateException("Unknown viewType: $viewType")
                 }
@@ -222,7 +234,7 @@ class MainActivity : AppCompatActivity() {
             override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int, payloads: MutableList<Any>) {
                 if (payloads.contains(NOTIFY_LIVE)) {
                     val view = holder.itemView as KlipperInstanceView
-                    view.bind(visibleInstances[position - 1])
+                    view.bind(visibleInstances[position - instanceOffset()])
                     return
                 }
                 super.onBindViewHolder(holder, position, payloads)
@@ -243,22 +255,39 @@ class MainActivity : AppCompatActivity() {
                         )
                         bindHeader(header)
                     }
+                    VIEW_TYPE_SECTION -> {
+                        val sec = holder.itemView as SectionHeaderView
+                        val n = visibleInstances.size
+                        sec.title.text = getString(R.string.Instances).uppercase(Locale.ROOT)
+                        sec.setCount(n)
+                        sec.visibility = View.VISIBLE
+                    }
+                    VIEW_TYPE_EMPTY -> {
+                        val empty = holder.itemView as EmptyStateView
+                        empty.setOnClickListener { openNewInstanceSheet() }
+                        ViewUtils.applyPressFeel(empty, 0.99f, 3f)
+                    }
                     VIEW_TYPE_INSTANCE -> {
+                        val offset = instanceOffset()
                         val view = holder.itemView as KlipperInstanceView
-                        view.bind(visibleInstances[position - 1])
+                        view.bind(visibleInstances[position - offset])
                         view.setOnClickListener {
-                            val inst = visibleInstances[position - 1]
+                            val inst = visibleInstances[position - offset]
                             newOrEditTitle.setText(R.string.EditInstance)
                             editInstance = inst
-                            editOpenDirectoryRow.visibility = View.VISIBLE
-                            autostartRow.bind(getString(R.string.Autostart), null, inst.autostart)
-                            nameRow.bind(R.string.InstanceName, inst.name)
-                            configRow.visibility = View.GONE
+                            editFolderRow.visibility = View.VISIBLE
+                            autostartSwitch.isChecked = inst.autostart
+                            newOrEditNameEt.setText(inst.name)
+                            newOrEditNameEt.setSelection(newOrEditNameEt.text?.length ?: 0)
+                            configPillRow.visibility = View.GONE
+                            selectedIconOrdinal = inst.icon.ordinal
+                            refreshTileSelection()
+                            val saveLbl = (newOrEditContinue.getChildAt(0) as? TextView)
+                            saveLbl?.setText(R.string.SaveProfile)
                             animateNewOrEditLayout(true)
-                            newOrEditContinue.setText(R.string.InstanceOK)
                         }
                         view.setOnLongClickListener {
-                            val inst = visibleInstances[position - 1]
+                            val inst = visibleInstances[position - offset]
                             MaterialAlertDialogBuilder(this@MainActivity)
                                 .setTitle(getString(R.string.InstanceDelete, inst.name))
                                 .setMessage(R.string.InstanceDeleteConfirm)
@@ -276,99 +305,256 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun getItemViewType(position: Int): Int {
-                return when (position) {
-                    0 -> VIEW_TYPE_HEADER
+                return when {
+                    position == 0 -> VIEW_TYPE_HEADER
+                    visibleInstances.isEmpty() && position == 1 -> VIEW_TYPE_EMPTY
+                    position == 1 -> VIEW_TYPE_SECTION
                     else -> VIEW_TYPE_INSTANCE
                 }
             }
 
-            override fun getItemCount(): Int = visibleInstances.size + 1
+            override fun getItemCount(): Int {
+                return if (visibleInstances.isEmpty()) 2 else 2 + visibleInstances.size
+            }
         }
         listView.adapter = instancesAdapter
         resizeFrame.addView(listView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 
-        val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = ViewUtils.resolveColor(this@MainActivity, R.attr.dividerColor)
-            style = Paint.Style.STROKE
-            strokeWidth = ViewUtils.dp(1f).toFloat()
-        }
+        val gridIcons: Array<InstanceIcon> = InstanceIcon.values().copyOfRange(0, 8)
+        tileOrdinals = IntArray(8) { gridIcons[it].ordinal }
+        fun fgFor(icon: InstanceIcon): Int = 0xFF000000.toInt()
 
-        newOrEditLayout = object : LinearLayout(this@MainActivity) {
-            init {
-                setWillNotDraw(false)
-            }
-
-            override fun draw(canvas: Canvas) {
-                super.draw(canvas)
-                for (i in 0 until childCount - 1) {
-                    val child = getChildAt(i)
-                    if (child.visibility == View.VISIBLE) {
-                        canvas.drawLine(
-                            ViewUtils.dp(1.5f).toFloat(), child.y + child.height - ViewUtils.dp(1),
-                            (child.width - ViewUtils.dp(1.5f)).toFloat(), child.y + child.height - ViewUtils.dp(1),
-                            dividerPaint
-                        )
-                    }
-                }
-            }
-        }.apply {
+        newOrEditLayout = LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.VERTICAL
+            setPadding(ViewUtils.dp(20), ViewUtils.dp(8), ViewUtils.dp(20), ViewUtils.dp(16))
             layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         }
 
-        newOrEditTitle = TextView(this@MainActivity).apply {
-            setTextColor(ViewUtils.resolveColor(this@MainActivity, android.R.attr.textColorPrimary))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
-            typeface = ViewUtils.getTypeface(ViewUtils.ROBOTO_MEDIUM)
-            gravity = Gravity.CENTER
-            setPadding(ViewUtils.dp(12), 0, ViewUtils.dp(12), 0)
-            layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(52))
-            setOnClickListener { animateNewOrEditLayout(false) }
-            isFocusable = false
+        val handleWrap = FrameLayout(this@MainActivity).apply {
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            setPadding(0, ViewUtils.dp(6), 0, ViewUtils.dp(8))
         }
-        newOrEditLayout.addView(newOrEditTitle)
+        val handleView = View(this@MainActivity).apply {
+            background = ViewUtils.makeRoundRectDrawable(0xFF000000.toInt(), ViewUtils.dp(999))
+        }
+        handleWrap.addView(handleView, FrameLayout.LayoutParams(ViewUtils.dp(40), ViewUtils.dp(6), Gravity.CENTER_HORIZONTAL))
+        newOrEditLayout.addView(handleWrap)
 
-        nameRow = EditTextRowView(this@MainActivity).apply {
-            setOnClickListener {
-                val frame = FrameLayout(it.context).apply {
-                    setPadding(ViewUtils.dp(21), 0, ViewUtils.dp(21), 0)
-                    val et = EditText(it.context).apply {
-                        setText(this@apply.text)
-                    }
-                    addView(et)
-                }
-                MaterialAlertDialogBuilder(it.context)
-                    .setTitle(R.string.InstanceName)
-                    .setView(frame)
-                    .setNegativeButton(android.R.string.cancel, null)
-                    .setPositiveButton(android.R.string.ok) { dialog, which ->
-                        nameRow.bind(R.string.InstanceName, (frame.getChildAt(0) as EditText).text.toString())
-                    }
-                    .show()
+        val headerRow = FrameLayout(this@MainActivity).apply {
+            setPadding(0, ViewUtils.dp(4), 0, ViewUtils.dp(16))
+        }
+        newOrEditTitle = TextView(this@MainActivity).apply {
+            setTextColor(0xFF000000.toInt())
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 28f)
+            typeface = ViewUtils.getTypeface(ViewUtils.ROBOTO_REGULAR)
+            gravity = Gravity.START or Gravity.CENTER_VERTICAL
+            setPadding(0, ViewUtils.dp(8), ViewUtils.dp(56), ViewUtils.dp(8))
+            layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        }
+        headerRow.addView(newOrEditTitle)
+        val closeBtn = ImageView(this@MainActivity).apply {
+            setImageResource(R.drawable.ic_cross_outline_28)
+            setColorFilter(0xFF8A8F98.toInt())
+            setPadding(ViewUtils.dp(10), ViewUtils.dp(10), ViewUtils.dp(10), ViewUtils.dp(10))
+            background = ViewUtils.resolveDrawable(this@MainActivity, androidx.appcompat.R.attr.selectableItemBackgroundBorderless)
+            isClickable = true; isFocusable = true
+            setOnClickListener { animateNewOrEditLayout(false) }
+            layoutParams = FrameLayout.LayoutParams(ViewUtils.dp(44), ViewUtils.dp(44)).apply {
+                gravity = Gravity.TOP or Gravity.END
             }
         }
-        newOrEditLayout.addView(nameRow)
+        headerRow.addView(closeBtn)
+        newOrEditLayout.addView(headerRow)
 
-        configRow = EditTextRowView(this@MainActivity).apply {
+        fun sectionLabel(@Suppress("SameParameterValue") s: String): TextView {
+            return TextView(this@MainActivity).apply {
+                text = s
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                typeface = ViewUtils.getTypeface(ViewUtils.ROBOTO_MEDIUM)
+                letterSpacing = 0.12f
+                setTextColor(0xFF000000.toInt())
+                isAllCaps = true
+                setPadding(ViewUtils.dp(4), ViewUtils.dp(16), ViewUtils.dp(4), ViewUtils.dp(12))
+            }
+        }
+        fun wrapMargins(v: View): View {
+            val wrap = FrameLayout(this@MainActivity)
+            wrap.addView(v, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            wrap.setPadding(ViewUtils.dp(4), 0, ViewUtils.dp(4), 0)
+            return wrap
+        }
+
+        newOrEditLayout.addView(sectionLabel(getString(R.string.LabelName)))
+        val colorSurfaceContainerHigh = ViewUtils.resolveColor(this@MainActivity, R.attr.colorSurfaceContainerHigh)
+        newOrEditNameEt = EditText(this@MainActivity).apply {
+            background = ViewUtils.makeRoundRectDrawable(colorSurfaceContainerHigh, ViewUtils.dp(22))
+            setPadding(ViewUtils.dp(20), ViewUtils.dp(18), ViewUtils.dp(20), ViewUtils.dp(18))
+            setHint(R.string.NewProfileHint)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+            setTextColor(ViewUtils.resolveColor(this@MainActivity, android.R.attr.textColorPrimary))
+            setHintTextColor(0xFF8A8F98.toInt())
+            minHeight = ViewUtils.dp(60)
+            gravity = Gravity.CENTER_VERTICAL
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS
+            isSingleLine = true
+        }
+        newOrEditLayout.addView(wrapMargins(newOrEditNameEt))
+
+        newOrEditLayout.addView(sectionLabel(getString(R.string.KlipperConfigTemplate)))
+        configPillRow = MaterialCardView(this@MainActivity).apply {
+            radius = ViewUtils.dp(22).toFloat()
+            cardElevation = 0f
+            strokeWidth = 0
+            setCardBackgroundColor(colorSurfaceContainerHigh)
+            isClickable = true
+            isFocusable = true
             setOnClickListener {
                 val config = File(KlipperApp.INSTANCE.filesDir, "klipper/config")
                 val filesList = config.listFiles()?.map { it.name }?.sorted() ?: emptyList()
-                MaterialAlertDialogBuilder(it.context)
+                MaterialAlertDialogBuilder(this@MainActivity)
                     .setTitle(R.string.InstanceConfig)
-                    .setItems(filesList.toTypedArray()) { dialog, which -> configRow.bind(R.string.InstanceConfig, filesList[which]) }
+                    .setItems(filesList.toTypedArray()) { _, which ->
+                        configPillLabel.setTextColor(ViewUtils.resolveColor(this@MainActivity, android.R.attr.textColorPrimary))
+                        configPillLabel.text = filesList[which]
+                    }
                     .show()
             }
+            foreground = ViewUtils.resolveDrawable(this@MainActivity, androidx.appcompat.R.attr.selectableItemBackground)
+            val contentLp = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(60))
+            val contentRow = FrameLayout(this@MainActivity).apply {
+                setPadding(ViewUtils.dp(20), 0, ViewUtils.dp(20), 0)
+                configPillLabel = TextView(this@MainActivity).apply {
+                    setTextColor(ViewUtils.resolveColor(this@MainActivity, android.R.attr.textColorPrimary))
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+                    gravity = Gravity.CENTER_VERTICAL or Gravity.START
+                    setCompoundDrawables(null, null, null, null)
+                }
+                addView(configPillLabel, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT).apply {
+                    marginEnd = ViewUtils.dp(32)
+                })
+                val chevron = ImageView(this@MainActivity).apply {
+                    setImageResource(R.drawable.ic_chevron_down_24)
+                    layoutParams = FrameLayout.LayoutParams(ViewUtils.dp(24), ViewUtils.dp(24)).apply {
+                        gravity = Gravity.CENTER_VERTICAL or Gravity.END
+                    }
+                }
+                addView(chevron)
+                layoutParams = contentLp
+            }
+            addView(contentRow)
+            ViewUtils.applyPressFeel(this, 0.992f, 2f)
         }
-        newOrEditLayout.addView(configRow)
+        newOrEditLayout.addView(wrapMargins(configPillRow))
 
-        editOpenDirectoryRow = TextView(this@MainActivity).apply {
-            setText(R.string.EditOpenDirectory)
-            setTextColor(ViewUtils.resolveColor(this@MainActivity, android.R.attr.textColorPrimary))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-            gravity = Gravity.START or Gravity.CENTER_VERTICAL
-            setPadding(ViewUtils.dp(21), 0, ViewUtils.dp(21), 0)
-            background = ViewUtils.resolveDrawable(this@MainActivity, android.R.attr.selectableItemBackground)
-            layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(52))
+        newOrEditLayout.addView(sectionLabel(getString(R.string.LabelIcon)))
+        val iconGrid = LinearLayout(this@MainActivity).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        val neutralTileBg = 0xFFFFFFFF.toInt()
+        iconTiles = Array(8) { idx ->
+            MaterialCardView(this@MainActivity).apply {
+                radius = ViewUtils.dp(16).toFloat()
+                cardElevation = 0f
+                strokeWidth = ViewUtils.dp(1)
+                strokeColor = 0x1A000000
+                setCardBackgroundColor(neutralTileBg)
+                val iv = ImageView(this@MainActivity).apply {
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    setImageResource(gridIcons[idx].drawable)
+                    setColorFilter(fgFor(gridIcons[idx]))
+                    setPadding(ViewUtils.dp(12), ViewUtils.dp(12), ViewUtils.dp(12), ViewUtils.dp(12))
+                }
+                addView(iv, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+                isClickable = true; isFocusable = true
+                foreground = ViewUtils.resolveDrawable(this@MainActivity, androidx.appcompat.R.attr.selectableItemBackgroundBorderless)
+                layoutParams = LinearLayout.LayoutParams(0, ViewUtils.dp(64), 1f).apply {
+                    marginStart = ViewUtils.dp(6); marginEnd = ViewUtils.dp(6)
+                }
+                ViewUtils.applyPressFeel(this, 0.95f, 2f)
+                setOnClickListener {
+                    selectedIconOrdinal = gridIcons[idx].ordinal
+                    refreshTileSelection()
+                }
+            }
+        }
+        val rowParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(64)).apply {
+            topMargin = ViewUtils.dp(4); bottomMargin = ViewUtils.dp(4)
+        }
+        for (r in 0 until 2) {
+            val row = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(ViewUtils.dp(2), 0, ViewUtils.dp(2), 0)
+                layoutParams = rowParams
+            }
+            for (c in 0 until 4) {
+                row.addView(iconTiles[r * 4 + c])
+            }
+            iconGrid.addView(row)
+        }
+        refreshTileSelection()
+        newOrEditLayout.addView(iconGrid)
+
+        val spacing24 = View(this@MainActivity).apply {
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(8))
+        }
+        newOrEditLayout.addView(spacing24)
+
+        editFolderRow = MaterialCardView(this@MainActivity).apply {
+            radius = ViewUtils.dp(16).toFloat()
+            cardElevation = 0f
+            strokeWidth = ViewUtils.dp(1)
+            strokeColor = 0x1A000000
+            setCardBackgroundColor(0xFFFFFFFF.toInt())
+            isClickable = true
+            isFocusable = true
+            visibility = View.GONE
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                leftMargin = ViewUtils.dp(4); rightMargin = ViewUtils.dp(4); topMargin = ViewUtils.dp(12)
+            }
+            val inner = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(ViewUtils.dp(18), ViewUtils.dp(16), ViewUtils.dp(14), ViewUtils.dp(16))
+            }
+            val textCol = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            editFolderTitle = TextView(this@MainActivity).apply {
+                text = getString(R.string.ProfileFolder)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+                typeface = ViewUtils.getTypeface(ViewUtils.ROBOTO_REGULAR)
+                setTextColor(0xFF000000.toInt())
+                includeFontPadding = false
+            }
+            textCol.addView(editFolderTitle)
+            editFolderSubtitle = TextView(this@MainActivity).apply {
+                text = getString(R.string.EditConfigFiles)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                setTextColor(0xFF666666.toInt())
+                includeFontPadding = false
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    topMargin = ViewUtils.dp(4)
+                }
+            }
+            textCol.addView(editFolderSubtitle)
+            inner.addView(textCol)
+            inner.addView(ImageView(this@MainActivity).apply {
+                setImageResource(R.drawable.ic_folder_outline_28)
+                setColorFilter(0xFF000000.toInt())
+                layoutParams = LinearLayout.LayoutParams(ViewUtils.dp(28), ViewUtils.dp(28)).apply {
+                    marginEnd = ViewUtils.dp(4)
+                }
+            }, LinearLayout.LayoutParams(ViewUtils.dp(28), ViewUtils.dp(28)).apply {
+                marginEnd = ViewUtils.dp(4)
+            })
+            inner.addView(ImageView(this@MainActivity).apply {
+                setImageResource(R.drawable.ic_chevron_right_28)
+                setColorFilter(0xFF98A2B3.toInt())
+            })
+            addView(inner)
+            foreground = ViewUtils.resolveDrawable(this@MainActivity, androidx.appcompat.R.attr.selectableItemBackground)
+            ViewUtils.applyPressFeel(this, 0.992f, 2f)
             setOnClickListener {
                 val uri = DocumentsContract.buildRootUri("ru.ytkab0bp.beamklipper", editInstance!!.id)
                 try {
@@ -385,26 +571,74 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        newOrEditLayout.addView(editOpenDirectoryRow)
+        newOrEditLayout.addView(editFolderRow)
 
-        autostartRow = PreferenceSwitchView(this@MainActivity).apply {
-            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(52))
-            setOnClickListener { isChecked = !isChecked }
+        val autoRow = LinearLayout(this@MainActivity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                leftMargin = ViewUtils.dp(4); rightMargin = ViewUtils.dp(4); topMargin = ViewUtils.dp(14); bottomMargin = ViewUtils.dp(18)
+            }
         }
-        newOrEditLayout.addView(autostartRow)
+        val autoTextCol = LinearLayout(this@MainActivity).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        autostartTitle = TextView(this@MainActivity).apply {
+            text = getString(R.string.Autostart)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+            typeface = ViewUtils.getTypeface(ViewUtils.ROBOTO_REGULAR)
+            setTextColor(0xFF000000.toInt())
+            includeFontPadding = false
+        }
+        autoTextCol.addView(autostartTitle)
+        autostartSubtitle = TextView(this@MainActivity).apply {
+            text = getString(R.string.AutostartSubtitle)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setTextColor(0xFF666666.toInt())
+            includeFontPadding = false
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                topMargin = ViewUtils.dp(4)
+            }
+        }
+        autoTextCol.addView(autostartSubtitle)
+        autoRow.addView(autoTextCol)
+        autostartSwitch = com.google.android.material.switchmaterial.SwitchMaterial(this@MainActivity).apply {
+            setPadding(0, 0, 0, 0)
+        }
+        autoRow.addView(autostartSwitch, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        newOrEditLayout.addView(autoRow)
 
-        newOrEditContinue = TextView(this@MainActivity).apply {
-            setTextColor(ViewUtils.resolveColor(this@MainActivity, android.R.attr.textColorPrimary))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-            typeface = ViewUtils.getTypeface(ViewUtils.ROBOTO_MEDIUM)
-            gravity = Gravity.CENTER
-            setPadding(ViewUtils.dp(12), 0, ViewUtils.dp(12), 0)
-            background = ViewUtils.resolveDrawable(this@MainActivity, android.R.attr.selectableItemBackground)
-            layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(52))
+        val primaryColor = 0xFF000000.toInt()
+        newOrEditContinue = MaterialCardView(this@MainActivity).apply {
+            radius = ViewUtils.dp(14).toFloat()
+            cardElevation = 0f
+            strokeWidth = ViewUtils.dp(1)
+            strokeColor = 0x00000000
+            isClickable = true; isFocusable = true
+            setCardBackgroundColor(primaryColor)
+            val lbl = TextView(this@MainActivity).apply {
+                setText(R.string.SaveProfile)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                typeface = ViewUtils.getTypeface(ViewUtils.ROBOTO_MEDIUM)
+                setTextColor(-0x1)
+                gravity = Gravity.CENTER
+                isAllCaps = true
+                letterSpacing = 0.08f
+            }
+            addView(lbl, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(58)))
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(64)).apply {
+                leftMargin = ViewUtils.dp(4); rightMargin = ViewUtils.dp(4)
+            }
+            foreground = ViewUtils.resolveDrawable(this@MainActivity, androidx.appcompat.R.attr.selectableItemBackground)
+            ViewUtils.applyPressFeel(this, 0.99f, 4f)
             var saving = false
             setOnClickListener {
                 if (saving) return@setOnClickListener
-                if (TextUtils.isEmpty(nameRow.text)) {
+                val nameText = newOrEditNameEt.text.toString().trim()
+                val cfgText = configPillLabel.text.toString().trim()
+                val selectedIcon = InstanceIcon.values()[selectedIconOrdinal]
+                if (TextUtils.isEmpty(nameText)) {
                     MaterialAlertDialogBuilder(this@MainActivity)
                         .setTitle(R.string.Error)
                         .setMessage(R.string.ErrorNameEmpty)
@@ -415,8 +649,9 @@ class MainActivity : AppCompatActivity() {
 
                 if (editInstance != null) {
                     val editing = editInstance!!
-                    editing.name = nameRow.text.toString().trim()
-                    editing.autostart = autostartRow.isChecked
+                    editing.name = nameText
+                    editing.autostart = autostartSwitch.isChecked
+                    editing.icon = selectedIcon
                     saving = true
                     isEnabled = false
                     KlipperApp.appScope.launch(kotlinx.coroutines.Dispatchers.IO) {
@@ -434,7 +669,7 @@ class MainActivity : AppCompatActivity() {
                     return@setOnClickListener
                 }
 
-                if (TextUtils.isEmpty(configRow.text)) {
+                if (TextUtils.isEmpty(cfgText)) {
                     MaterialAlertDialogBuilder(this@MainActivity)
                         .setTitle(R.string.Error)
                         .setMessage(R.string.ErrorConfigEmpty)
@@ -445,11 +680,11 @@ class MainActivity : AppCompatActivity() {
 
                 val inst = KlipperInstance().apply {
                     id = UUID.randomUUID().toString()
-                    name = nameRow.text.toString().trim()
-                    autostart = autostartRow.isChecked
+                    name = nameText
+                    autostart = autostartSwitch.isChecked
+                    icon = selectedIcon
                 }
                 val cfg = File(inst.publicDirectory, "config/printer.cfg")
-                val cfgText = configRow.text.toString()
                 saving = true
                 isEnabled = false
                 KlipperApp.appScope.launch(kotlinx.coroutines.Dispatchers.IO) {
@@ -492,6 +727,31 @@ class MainActivity : AppCompatActivity() {
             topMargin = ViewUtils.dp(12)
             leftMargin = ViewUtils.dp(12)
             rightMargin = ViewUtils.dp(12)
+        })
+
+        val fabSize = ViewUtils.dp(56)
+        val fabPrimary = 0xFF000000.toInt()
+        fab = MaterialCardView(this@MainActivity).apply {
+            radius = ViewUtils.dp(18).toFloat()
+            cardElevation = ViewUtils.dp(6).toFloat()
+            strokeWidth = 0
+            setCardBackgroundColor(fabPrimary)
+            isClickable = true; isFocusable = true
+            val wrap = FrameLayout(this@MainActivity)
+            val iv = ImageView(this@MainActivity).apply {
+                setImageResource(R.drawable.ic_add_plus_28)
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                setColorFilter(-0x1)
+            }
+            wrap.addView(iv, FrameLayout.LayoutParams(ViewUtils.dp(28), ViewUtils.dp(28), Gravity.CENTER))
+            addView(wrap, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            foreground = ViewUtils.resolveDrawable(this@MainActivity, androidx.appcompat.R.attr.selectableItemBackgroundBorderless)
+            ViewUtils.applyPressFeel(this, 0.9f, 8f)
+            setOnClickListener { openNewInstanceSheet() }
+        }
+        homeView.addView(fab, FrameLayout.LayoutParams(fabSize, fabSize, Gravity.BOTTOM or Gravity.END).apply {
+            rightMargin = ViewUtils.dp(24)
+            bottomMargin = ViewUtils.dp(24)
         })
 
         fl.addView(homeView)
@@ -590,14 +850,36 @@ class MainActivity : AppCompatActivity() {
 
         fl.setBackgroundColor(ViewUtils.resolveColor(this@MainActivity, android.R.attr.windowBackground))
         setContentView(fl)
+        fl.addOnLayoutChangeListener { _, _, _, _, _, oldL, oldT, oldR, oldB ->
+            val w = fl.width
+            val h = fl.height
+            val token = (w shl 16) or h
+            if (token != responsiveLayoutToken) {
+                responsiveLayoutToken = token
+                applyResponsiveLayout()
+            }
+        }
+        applyResponsiveLayout()
 
         processIntent(intent)
         instances = ArrayList(KlipperInstance.getInstances())
+        applyFilter()
         KlipperApp.EVENT_BUS.registerListener(this)
 
         if (Prefs.getLastCommit() != BuildConfig.COMMIT && KlipperApp.hasUpdateInfo) {
             Prefs.setLastCommit()
             ChangeLogBottomSheet(this@MainActivity).show()
+        }
+
+        if (intent.getBooleanExtra("open_settings", false)) {
+            preferencesView.postDelayed({
+                homeView.animateTo(-1f)
+            }, 300)
+        }
+        if (intent.getBooleanExtra("open_new", false)) {
+            resizeFrame.postDelayed({
+                openNewInstanceSheet()
+            }, 350)
         }
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -614,6 +896,10 @@ class MainActivity : AppCompatActivity() {
                 onBackPressedDispatcher.onBackPressed()
             }
         })
+    }
+
+    fun closePreferences() {
+        homeView.animateTo(0f)
     }
 
     override fun onDestroy() {
@@ -690,10 +976,16 @@ class MainActivity : AppCompatActivity() {
     fun onInstancesRefreshed(e: InstancesRefreshedEvent) {
         instances = ArrayList(KlipperInstance.getInstances())
         applyFilter()
+        listView.adapter?.notifyItemChanged(0)
     }
 
     @EventHandler(runOnMainThread = true)
     fun onFrontendChanged(e: WebFrontendChangedEvent) {
+        listView.adapter?.notifyItemChanged(0)
+    }
+
+    @EventHandler(runOnMainThread = true)
+    fun onEngineChanged(e: EngineChangedEvent) {
         listView.adapter?.notifyItemChanged(0)
     }
 
@@ -706,7 +998,7 @@ class MainActivity : AppCompatActivity() {
     fun onInstanceStateChanged(e: InstanceStateChangedEvent) {
         val idx = visibleInstances.indexOfFirst { it.id == e.id }
         if (idx >= 0) {
-            listView.adapter?.notifyItemChanged(idx + 1, NOTIFY_LIVE)
+            listView.adapter?.notifyItemChanged(idx + 2, NOTIFY_LIVE)
         }
     }
 
@@ -717,17 +1009,45 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openNewInstanceSheet() {
-        newOrEditTitle.setText(R.string.NewInstance)
+        newOrEditTitle.setText(R.string.NewPrinterProfile)
         editInstance = null
-        editOpenDirectoryRow.visibility = View.GONE
-        autostartRow.bind(getString(R.string.Autostart), null, false)
-        nameRow.bind(R.string.InstanceName, null)
-        configRow.apply {
-            bind(R.string.InstanceConfig, null)
-            visibility = View.VISIBLE
+        editFolderRow.visibility = View.GONE
+        autostartSwitch.isChecked = false
+        newOrEditNameEt.text = null
+        newOrEditNameEt.clearFocus()
+        val filesDir = File(KlipperApp.INSTANCE.filesDir, "klipper/config")
+        val filesList = filesDir.listFiles()?.map { it.name }?.sorted() ?: emptyList()
+        val defaultCfg = filesList.firstOrNull { it.contains("ender", ignoreCase = true) }
+            ?: filesList.firstOrNull().orEmpty()
+        configPillLabel.setTextColor(if (defaultCfg.isEmpty()) 0xFF8A8F98.toInt() else ViewUtils.resolveColor(this@MainActivity, android.R.attr.textColorPrimary))
+        configPillLabel.text = defaultCfg.ifEmpty { getString(R.string.InstanceConfig) }
+        configPillRow.visibility = View.VISIBLE
+        selectedIconOrdinal = 0
+        refreshTileSelection()
+        val saveLbl = (newOrEditContinue.getChildAt(0) as? TextView)
+        saveLbl?.setText(R.string.CreateProfile)
+        newOrEditNameEt.post {
+            val imm = getSystemService(INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+            imm?.showSoftInput(newOrEditNameEt, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
         }
-        newOrEditContinue.setText(R.string.InstanceCreate)
         animateNewOrEditLayout(true)
+    }
+
+    private fun refreshTileSelection() {
+        val selOrd = selectedIconOrdinal
+        val selectedBg = 0xFF000000.toInt()
+        val selectedStroke = 0xFF000000.toInt()
+        val neutralBg = 0xFFFFFFFF.toInt()
+        val neutralStroke = 0x1A000000.toInt()
+        for (i in 0 until 8) {
+            val tile = iconTiles[i]
+            val selected = tileOrdinals[i] == selOrd
+            tile.setCardBackgroundColor(if (selected) selectedBg else neutralBg)
+            tile.strokeColor = if (selected) selectedStroke else neutralStroke
+            tile.cardElevation = 0f
+            val iv = tile.getChildAt(0) as? ImageView
+            iv?.setColorFilter(if (selected) 0xFFFFFFFF.toInt() else 0xFF000000.toInt())
+        }
     }
 
     private fun openWebFrontend() {
@@ -741,23 +1061,88 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun bindHeader(header: MainHeaderView) {
-        val webTitle = when (Prefs.webFrontend) {
-            Prefs.FRONTEND_FLUIDD -> getString(R.string.Fluidd)
-            else -> getString(R.string.Mainsail)
-        }
         val isWebRunning = KlipperInstance.isWebServerRunning()
-        val webSubtitle = if (isWebRunning) {
+        val webUrlStr = if (isWebRunning) {
             val wm = KlipperApp.INSTANCE.getSystemService(Context.WIFI_SERVICE) as WifiManager
-            getString(R.string.IPInfo, Formatter.formatIpAddress(wm.connectionInfo.ipAddress), WebService.PORT)
+            val ip = Formatter.formatIpAddress(wm.connectionInfo.ipAddress)
+            "http://$ip:${ru.ytkab0bp.beamklipper.service.WebService.PORT}/"
         } else {
-            getString(R.string.web_tile_offline)
+            ""
         }
+        val activeCount = instances.count { it.getState() == KlipperInstance.State.RUNNING }
         header.bind(
-            webTitle = webTitle,
-            webSubtitle = webSubtitle,
-            isWebEnabled = isWebRunning,
-            instancesSubtitle = getString(R.string.Instances) + " • " + instances.size
+            webUrlString = webUrlStr,
+            isWebRunning = isWebRunning,
+            activeCount = activeCount,
+            instancesTotal = instances.size
         )
+    }
+
+    private fun applyResponsiveLayout() {
+        val ctx = this@MainActivity
+        val sw = ViewUtils.screenWidthDp(ctx)
+        val sh = ViewUtils.screenHeightDp(ctx)
+        val landscape = ViewUtils.isLandscape(ctx)
+        val wide = ViewUtils.isWideScreen(ctx)
+
+        val listCardMaxWidth = when {
+            wide && landscape -> 640
+            wide -> 560
+            sw >= 420 -> 440
+            else -> Int.MAX_VALUE
+        }
+        if (listCardMaxWidth < Int.MAX_VALUE) {
+            ViewUtils.applyMaxWidth(listCardView, listCardMaxWidth, Gravity.CENTER, 16)
+        } else {
+            val lp = listCardView.layoutParams as FrameLayout.LayoutParams
+            lp.width = ViewGroup.LayoutParams.MATCH_PARENT
+            val baseSide = if (sw < 360) 12 else 21
+            lp.leftMargin = ViewUtils.dp(baseSide)
+            lp.rightMargin = ViewUtils.dp(baseSide)
+            lp.gravity = Gravity.CENTER
+            listCardView.layoutParams = lp
+        }
+
+        val noPermsMax = if (wide) 520 else Int.MAX_VALUE
+        if (noPermsMax < Int.MAX_VALUE) {
+            ViewUtils.applyMaxWidth(noPermsLayout, noPermsMax, Gravity.CENTER, 16)
+        } else {
+            val lp = noPermsLayout.layoutParams as FrameLayout.LayoutParams
+            lp.width = ViewGroup.LayoutParams.MATCH_PARENT
+            lp.gravity = Gravity.CENTER
+            noPermsLayout.layoutParams = lp
+        }
+
+        val prefMax = when {
+            wide && landscape -> 620
+            wide -> 540
+            else -> Int.MAX_VALUE
+        }
+        if (prefMax < Int.MAX_VALUE) {
+            ViewUtils.applyMaxWidth(preferencesView, prefMax, Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM, 16)
+        } else {
+            val lp = preferencesView.layoutParams as FrameLayout.LayoutParams
+            lp.width = ViewGroup.LayoutParams.MATCH_PARENT
+            lp.gravity = Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM
+            preferencesView.layoutParams = lp
+        }
+
+        val topBarsMargin = if (landscape || sh < 640) {
+            40
+        } else if (sh < 750) {
+            56
+        } else {
+            64
+        }
+        val bottomMargin = if (landscape || sh < 640) {
+            48
+        } else {
+            72
+        }
+        val lp = listCardView.layoutParams as FrameLayout.LayoutParams
+        lp.topMargin = ViewUtils.dp(topBarsMargin)
+        lp.bottomMargin = ViewUtils.dp(bottomMargin)
+        listCardView.layoutParams = lp
     }
 
     private fun animateNewOrEditLayout(visible: Boolean) {
@@ -786,7 +1171,7 @@ class MainActivity : AppCompatActivity() {
                 if (visible) {
                     listView.visibility = View.GONE
                     resizeFrame.removeForceNotMeasure(listView)
-                    nameRow.requestFocus()
+                    newOrEditNameEt.requestFocus()
                 } else {
                     newOrEditLayout.visibility = View.GONE
                     resizeFrame.removeForceNotMeasure(newOrEditLayout)
@@ -830,8 +1215,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        responsiveLayoutToken = -1
+        applyResponsiveLayout()
+    }
+
     override fun onResume() {
         super.onResume()
+        applyResponsiveLayout()
         batteryRow.isChecked = PermissionsChecker.hasBatteryPerm()
         hideServicesChannelRow?.isChecked = PermissionsChecker.isNotificationsChannelHidden()
         brokenBySDCardRow?.isChecked = PermissionsChecker.isNotBrokenBySDCard()
@@ -843,20 +1235,32 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun processIntent(intent: Intent?) {
-        if (intent != null && intent.action == UsbManager.ACTION_USB_DEVICE_ATTACHED) {
-            val prober = UsbSerialProber(KlipperProbeTable.getInstance())
-            val manager = getSystemService(Context.USB_SERVICE) as UsbManager
-            for (drv in prober.findAllDrivers(manager)) {
-                if (!manager.hasPermission(drv.device)) {
-                    manager.requestPermission(drv.device,
-                        PendingIntent.getBroadcast(this, 0,
-                            Intent(UsbSerialManager.ACTION_ON_DEVICE_CONNECTED).setPackage(packageName),
-                            PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_NO_CREATE))
-                } else {
-                    sendBroadcast(Intent(UsbSerialManager.ACTION_ON_DEVICE_CONNECTED)
-                        .putExtra(UsbManager.EXTRA_DEVICE, drv.device)
-                        .putExtra(UsbManager.EXTRA_PERMISSION_GRANTED, true)
-                        .setPackage(packageName))
+        if (intent != null) {
+            if (intent.getBooleanExtra("open_settings", false)) {
+                preferencesView.postDelayed({
+                    homeView.animateTo(-1f)
+                }, 300)
+            }
+            if (intent.getBooleanExtra("open_new", false)) {
+                resizeFrame.postDelayed({
+                    openNewInstanceSheet()
+                }, 350)
+            }
+            if (intent.action == UsbManager.ACTION_USB_DEVICE_ATTACHED) {
+                val prober = UsbSerialProber(KlipperProbeTable.getInstance())
+                val manager = getSystemService(Context.USB_SERVICE) as UsbManager
+                for (drv in prober.findAllDrivers(manager)) {
+                    if (!manager.hasPermission(drv.device)) {
+                        manager.requestPermission(drv.device,
+                            PendingIntent.getBroadcast(this, 0,
+                                Intent(UsbSerialManager.ACTION_ON_DEVICE_CONNECTED).setPackage(packageName),
+                                PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_NO_CREATE))
+                    } else {
+                        sendBroadcast(Intent(UsbSerialManager.ACTION_ON_DEVICE_CONNECTED)
+                            .putExtra(UsbManager.EXTRA_DEVICE, drv.device)
+                            .putExtra(UsbManager.EXTRA_PERMISSION_GRANTED, true)
+                            .setPackage(packageName))
+                    }
                 }
             }
         }

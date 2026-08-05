@@ -1,12 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="cardOutlineColor">#09000000</color>
+    <color name="cardOutlineColor">#1A000000</color>
     <color name="navigationBarColor">#F5F5F5</color>
-    <color name="windowBackground">#FFF</color>
-    <color name="dividerColor">#20000000</color>
+    <color name="windowBackground">#F5F5F5</color>
+    <color name="dividerColor">#0F000000</color>
 
-    <color name="beam_lavender_primary">#B7A6F2</color>
-    <color name="beam_lavender_on_primary">#1F1638</color>
-    <color name="beam_lavender_primary_container">#E7DFFF</color>
-    <color name="beam_lavender_on_primary_container">#1F1638</color>
+    <color name="beam_black_primary">#000000</color>
+    <color name="beam_white">#FFFFFF</color>
+    <color name="beam_offwhite_bg">#F5F5F5</color>
+    <color name="beam_ink_900">#111111</color>
+    <color name="beam_ink_700">#333333</color>
+    <color name="beam_ink_500">#666666</color>
+    <color name="beam_ink_300">#AAAAAA</color>
+    <color name="beam_ink_100">#E5E5E5</color>
+    <color name="beam_row_white">#FFFFFF</color>
+
+    <color name="beam_status_idle_bg">#EEEEEE</color>
+    <color name="beam_status_idle_fg">#000000</color>
+    <color name="beam_status_running_bg">#000000</color>
+    <color name="beam_status_running_fg">#FFFFFF</color>
+    <color name="beam_status_starting_bg">#EEEEEE</color>
+    <color name="beam_status_starting_fg">#000000</color>
+    <color name="beam_status_stopping_bg">#EEEEEE</color>
+    <color name="beam_status_stopping_fg">#000000</color>
+
+    <color name="beam_dot_grid">#14000000</color>
+
+    <color name="beam_tile_grey_bg">#FFFFFF</color>
+    <color name="beam_tile_grey_fg">#000000</color>
+    <color name="beam_tile_blue_bg">#FFFFFF</color>
+    <color name="beam_tile_blue_fg">#000000</color>
+    <color name="beam_tile_coral_bg">#FFFFFF</color>
+    <color name="beam_tile_coral_fg">#000000</color>
+    <color name="beam_tile_purple_bg">#FFFFFF</color>
+    <color name="beam_tile_purple_fg">#000000</color>
+    <color name="beam_tile_green_bg">#FFFFFF</color>
+    <color name="beam_tile_green_fg">#000000</color>
+    <color name="beam_tile_yellow_bg">#FFFFFF</color>
+    <color name="beam_tile_yellow_fg">#000000</color>
 </resources>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="beam_lavender_primary">#D8CEFF</color>
-    <color name="beam_lavender_on_primary">#2B2344</color>
-    <color name="beam_lavender_primary_container">#4A3D73</color>
-    <color name="beam_lavender_on_primary_container">#F2EEFF</color>
+    <color name="beam_lavender_primary">#B9A8FF</color>
+    <color name="beam_lavender_on_primary">#1F1642</color>
+    <color name="beam_lavender_primary_container">#554686</color>
+    <color name="beam_lavender_on_primary_container">#F1ECFF</color>
 </resources>

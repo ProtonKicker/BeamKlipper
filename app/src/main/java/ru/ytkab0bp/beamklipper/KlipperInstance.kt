@@ -37,6 +37,21 @@ class KlipperInstance {
 
     fun getState(): State = state
 
+    fun getSlot(): Int = slot
+
+    fun hasSlot(): Boolean = slot >= 0
+
+    fun copyRuntimeStateFrom(other: KlipperInstance) {
+        this.state = other.state
+        this.klippyIntent = other.klippyIntent
+        this.klippyConnection = other.klippyConnection
+        this.klippyConnected = other.klippyConnected
+        this.moonrakerIntent = other.moonrakerIntent
+        this.moonrakerConnection = other.moonrakerConnection
+        this.moonrakerConnected = other.moonrakerConnected
+        this.slot = other.slot
+    }
+
     val directory: File
         get() = File(KlipperApp.INSTANCE.filesDir, "instance${File.separator}$id")
 
@@ -245,29 +260,37 @@ class KlipperInstance {
         @JvmStatic
         fun onInstancesLoadedFromDB(loaded: List<KlipperInstance>) {
             Log.i("beam_instance", "onInstancesLoadedFromDB: count=${loaded.size}")
+            val byId = HashMap<String, KlipperInstance>()
             for (inst in loaded) {
-                val was = getInstance(inst.id ?: continue)
-                if (was != null) {
-                    inst.state = was.state
-                    inst.klippyConnection = was.klippyConnection
-                    inst.klippyConnected = was.klippyConnected
-                    inst.klippyIntent = was.klippyIntent
-                    inst.moonrakerConnection = was.moonrakerConnection
-                    inst.moonrakerConnected = was.moonrakerConnected
-                    inst.moonrakerIntent = was.moonrakerIntent
-                    inst.slot = was.slot
-                    slots.remove(was)
-                    slots[inst] = inst.slot
+                val id = inst.id ?: continue
+                byId[id] = inst
+            }
+            val slotsSnapshot = slots.toMap()
+            for ((was, oldSlot) in slotsSnapshot) {
+                val id = was.id ?: continue
+                val merged = byId[id]
+                if (merged == null) {
+                    Log.i("beam_instance", "mergeSlots: resurrecting in-memory id=$id name=${was.name}")
+                    byId[id] = was
+                } else {
+                    merged.copyRuntimeStateFrom(was)
                 }
             }
-            instances = loaded
+            val mergedList = byId.values.toList()
+            for (inst in mergedList) {
+                Log.i("beam_instance", "instance id=${inst.id} name=${inst.name} autostart=${inst.autostart} state=${inst.getState()} slot=${inst.getSlot()}")
+            }
+            instances = mergedList
+            slots.clear()
+            for (inst in mergedList) {
+                if (inst.hasSlot()) slots[inst] = inst.getSlot()
+            }
             instanceMap.clear()
             KlipperApp.EVENT_BUS.fireEvent(InstancesRefreshedEvent())
 
-            for (inst in instances) {
-                Log.i("beam_instance", "instance id=${inst.id} name=${inst.name} autostart=${inst.autostart} state=${inst.getState()}")
-                if (inst.autostart && inst.getState() == State.IDLE) {
-                    Log.i("beam_instance", "  -> calling start()")
+            for (inst in mergedList) {
+                if (inst.autostart && inst.getState() == State.IDLE && !inst.hasSlot()) {
+                    Log.i("beam_instance", "  -> calling start() for id=${inst.id}")
                     inst.start()
                 }
             }
