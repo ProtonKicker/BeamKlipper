@@ -4,4 +4,9 @@
     <color name="navigationBarColor">#F5F5F5</color>
     <color name="windowBackground">#FFF</color>
     <color name="dividerColor">#20000000</color>
+
+    <color name="beam_lavender_primary">#B7A6F2</color>
+    <color name="beam_lavender_on_primary">#1F1638</color>
+    <color name="beam_lavender_primary_container">#E7DFFF</color>
+    <color name="beam_lavender_on_primary_container">#1F1638</color>
 </resources>

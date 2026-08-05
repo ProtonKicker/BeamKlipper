@@ -26,6 +26,7 @@ import ru.ytkab0bp.beamklipper.utils.Prefs
 import ru.ytkab0bp.eventbus.EventBus
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
+import com.google.android.material.color.DynamicColors
 
 class KlipperApp : MultiDexApplication() {
     override fun attachBaseContext(base: Context) {

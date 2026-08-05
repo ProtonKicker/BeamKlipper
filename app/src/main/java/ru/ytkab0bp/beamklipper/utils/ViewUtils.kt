@@ -11,7 +11,12 @@ import android.graphics.drawable.RippleDrawable
 import android.os.Handler
 import android.os.Looper
 import android.util.TypedValue
+import android.view.MotionEvent
+import android.view.View
 import android.view.animation.PathInterpolator
+import androidx.dynamicanimation.animation.DynamicAnimation
+import androidx.dynamicanimation.animation.SpringAnimation
+import androidx.dynamicanimation.animation.SpringForce
 import ru.ytkab0bp.beamklipper.KlipperApp
 
 object ViewUtils {
@@ -93,5 +98,38 @@ object ViewUtils {
             } else null,
             mask
         )
+    }
+
+    @JvmStatic
+    fun applyPressScale(view: View, pressedScale: Float = 0.985f) {
+        view.scaleX = 1f
+        view.scaleY = 1f
+
+        val sx = SpringAnimation(view, DynamicAnimation.SCALE_X, 1f).apply {
+            spring = SpringForce(1f)
+                .setStiffness(900f)
+                .setDampingRatio(0.85f)
+            minimumVisibleChange = DynamicAnimation.MIN_VISIBLE_CHANGE_SCALE
+        }
+        val sy = SpringAnimation(view, DynamicAnimation.SCALE_Y, 1f).apply {
+            spring = SpringForce(1f)
+                .setStiffness(900f)
+                .setDampingRatio(0.85f)
+            minimumVisibleChange = DynamicAnimation.MIN_VISIBLE_CHANGE_SCALE
+        }
+
+        view.setOnTouchListener { v, ev ->
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    sx.animateToFinalPosition(pressedScale)
+                    sy.animateToFinalPosition(pressedScale)
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    sx.animateToFinalPosition(1f)
+                    sy.animateToFinalPosition(1f)
+                }
+            }
+            false
+        }
     }
 }

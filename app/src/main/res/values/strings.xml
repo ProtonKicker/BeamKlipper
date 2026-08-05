@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="search">Search</string>
     <string name="AppName" translatable="false">Beam Klipper</string>
     <string name="InstanceN">%s</string>
     <string name="ServicesChannel">Services</string>
@@ -51,6 +52,7 @@
     <string name="Kalico" translatable="false">Kalico</string>
     <string name="Klipper" translatable="false">Klipper</string>
     <string name="IPInfo" translatable="false">http://%s:%d/</string>
+    <string name="web_tile_offline">Start a profile to enable</string>
     <string name="General">General</string>
     <string name="WebFrontend">Web frontend</string>
     <string name="FirmwareEngine">Firmware engine</string>

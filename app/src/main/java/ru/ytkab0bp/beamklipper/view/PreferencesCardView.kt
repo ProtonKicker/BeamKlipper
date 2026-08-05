@@ -106,8 +106,8 @@ class PreferencesCardView(context: Context) : FrameLayout(context) {
 
         title = TextView(context).apply {
             setText(R.string.Settings)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
-            setTextColor(ViewUtils.resolveColor(context, android.R.attr.textColorSecondary))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 24f)
+            setTextColor(ViewUtils.resolveColor(context, android.R.attr.textColorPrimary))
             typeface = ViewUtils.getTypeface(ViewUtils.ROBOTO_MEDIUM)
             gravity = Gravity.CENTER
         }

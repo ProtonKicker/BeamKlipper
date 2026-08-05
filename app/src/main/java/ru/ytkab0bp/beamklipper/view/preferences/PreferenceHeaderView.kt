@@ -10,6 +10,6 @@ class PreferenceHeaderView(context: Context) : AppCompatTextView(context) {
         setPadding(ViewUtils.dp(21), ViewUtils.dp(6), ViewUtils.dp(21), 0)
         setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
         typeface = ViewUtils.getTypeface(ViewUtils.ROBOTO_MEDIUM)
-        setTextColor(ViewUtils.resolveColor(context, android.R.attr.colorAccent))
+        setTextColor(ViewUtils.resolveColor(context, android.R.attr.colorPrimary))
     }
 }

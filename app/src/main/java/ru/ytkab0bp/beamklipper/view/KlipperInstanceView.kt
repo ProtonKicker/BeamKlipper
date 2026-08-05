@@ -3,7 +3,6 @@ package ru.ytkab0bp.beamklipper.view
 import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
-import android.graphics.Color
 import android.net.Uri
 import android.net.wifi.WifiManager
 import android.text.format.Formatter
@@ -14,11 +13,12 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.cardview.widget.CardView
 import androidx.dynamicanimation.animation.FloatValueHolder
 import androidx.dynamicanimation.animation.SpringAnimation
 import androidx.dynamicanimation.animation.SpringForce
+import androidx.core.graphics.ColorUtils
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import ru.ytkab0bp.beamklipper.KlipperApp
 import ru.ytkab0bp.beamklipper.KlipperInstance
@@ -31,9 +31,9 @@ import ru.ytkab0bp.beamklipper.utils.ViewUtils
 import ru.ytkab0bp.eventbus.EventHandler
 import java.util.LinkedList
 
-class KlipperInstanceView(context: Context) : LinearLayout(context) {
+class KlipperInstanceView(context: Context) : MaterialCardView(context) {
     private var id: String? = null
-    private val cardView: CardView
+    private val iconCardView: MaterialCardView
     private val icon: ImageView
     private val titleSubtitleLayout: LinearLayout
     private val title: TextView
@@ -43,56 +43,77 @@ class KlipperInstanceView(context: Context) : LinearLayout(context) {
     private val visibleAnimationQueue = LinkedList<Runnable>()
 
     init {
-        setPadding(ViewUtils.dp(16), ViewUtils.dp(12), ViewUtils.dp(16), ViewUtils.dp(12))
-        gravity = Gravity.CENTER_VERTICAL
-        setWillNotDraw(false)
-        background = ViewUtils.resolveDrawable(context, android.R.attr.selectableItemBackground)
-        layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        radius = ViewUtils.dp(28).toFloat()
+        cardElevation = 0f
+        setCardBackgroundColor(ViewUtils.resolveColor(context, com.google.android.material.R.attr.colorSurfaceContainerLow))
+        
+        val marginParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        marginParams.setMargins(ViewUtils.dp(16), ViewUtils.dp(8), ViewUtils.dp(16), ViewUtils.dp(8))
+        layoutParams = marginParams
 
-        cardView = CardView(context).apply {
+        val innerLayout = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(ViewUtils.dp(16), ViewUtils.dp(16), ViewUtils.dp(16), ViewUtils.dp(16))
+            layoutParams = LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        }
+
+        iconCardView = MaterialCardView(context).apply {
             cardElevation = 0f
-            radius = ViewUtils.dp(14).toFloat()
+            radius = ViewUtils.dp(16).toFloat()
             val fl = FrameLayout(context).apply {
-                setPadding(ViewUtils.dp(8), ViewUtils.dp(8), ViewUtils.dp(8), ViewUtils.dp(8))
+                setPadding(ViewUtils.dp(12), ViewUtils.dp(12), ViewUtils.dp(12), ViewUtils.dp(12))
                 icon = ImageView(context).apply {
-                    imageTintList = ColorStateList.valueOf(Color.WHITE)
-                    layoutParams = LayoutParams(ViewUtils.dp(24), ViewUtils.dp(24))
+                    imageTintList = ColorStateList.valueOf(
+                        ViewUtils.resolveColor(context, com.google.android.material.R.attr.colorOnSurface)
+                    )
+                    layoutParams = LayoutParams(ViewUtils.dp(28), ViewUtils.dp(28))
                 }
                 addView(icon)
             }
             addView(fl)
         }
-        addView(cardView)
+        innerLayout.addView(iconCardView)
 
         titleSubtitleLayout = LinearLayout(context).apply {
-            orientation = VERTICAL
+            orientation = LinearLayout.VERTICAL
             clipToPadding = false
             clipChildren = false
         }
 
         title = TextView(context).apply {
             setTextColor(ViewUtils.resolveColor(context, android.R.attr.textColorPrimary))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            typeface = ViewUtils.getTypeface(ViewUtils.ROBOTO_MEDIUM)
         }
         titleSubtitleLayout.addView(title)
 
         subtitle = TextView(context).apply {
             setTextColor(ViewUtils.resolveColor(context, android.R.attr.textColorSecondary))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             visibility = GONE
         }
         titleSubtitleLayout.addView(subtitle)
 
-        addView(titleSubtitleLayout, LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
-            leftMargin = ViewUtils.dp(12)
-            rightMargin = ViewUtils.dp(12)
+        innerLayout.addView(titleSubtitleLayout, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+            leftMargin = ViewUtils.dp(16)
+            rightMargin = ViewUtils.dp(16)
         })
 
         startStopButton = StartStopButton(context).apply {
             setPadding(ViewUtils.dp(8), ViewUtils.dp(8), ViewUtils.dp(8), ViewUtils.dp(8))
-            layoutParams = LayoutParams(ViewUtils.dp(28 + 12), ViewUtils.dp(28 + 12))
+            layoutParams = LinearLayout.LayoutParams(ViewUtils.dp(32 + 12), ViewUtils.dp(32 + 12))
         }
-        addView(startStopButton)
+        innerLayout.addView(startStopButton)
+        
+        addView(innerLayout)
+        
+        isClickable = true
+        isFocusable = true
+        rippleColor = ColorStateList.valueOf(ViewUtils.resolveColor(context, android.R.attr.colorControlHighlight))
+
+        ViewUtils.applyPressScale(this)
+        applyCardTint(ViewUtils.resolveColor(context, R.attr.startStopButtonColor_0))
     }
 
     override fun onAttachedToWindow() {
@@ -105,21 +126,29 @@ class KlipperInstanceView(context: Context) : LinearLayout(context) {
         KlipperApp.EVENT_BUS.unregisterListener(this)
     }
 
+    private fun applyCardTint(accentColor: Int) {
+        val base = ViewUtils.resolveColor(context, com.google.android.material.R.attr.colorSurfaceContainerLow)
+        setCardBackgroundColor(ColorUtils.blendARGB(base, accentColor, 0.06f))
+    }
+
     fun setColorIndex(i: Int) {
-        val idx = Math.abs(i) % 10
-        cardView.setCardBackgroundColor(ViewUtils.resolveColor(context,
-            when (idx) {
-                1 -> R.attr.startStopButtonColor_1
-                2 -> R.attr.startStopButtonColor_2
-                3 -> R.attr.startStopButtonColor_3
-                4 -> R.attr.startStopButtonColor_4
-                5 -> R.attr.startStopButtonColor_5
-                6 -> R.attr.startStopButtonColor_6
-                7 -> R.attr.startStopButtonColor_7
-                8 -> R.attr.startStopButtonColor_8
-                9 -> R.attr.startStopButtonColor_9
-                else -> R.attr.startStopButtonColor_0
-            }))
+        iconCardView.setCardBackgroundColor(
+            ViewUtils.resolveColor(context,
+                when (Math.abs(i) % 10) {
+                    1 -> R.attr.startStopButtonColor_1
+                    2 -> R.attr.startStopButtonColor_2
+                    3 -> R.attr.startStopButtonColor_3
+                    4 -> R.attr.startStopButtonColor_4
+                    5 -> R.attr.startStopButtonColor_5
+                    6 -> R.attr.startStopButtonColor_6
+                    7 -> R.attr.startStopButtonColor_7
+                    8 -> R.attr.startStopButtonColor_8
+                    9 -> R.attr.startStopButtonColor_9
+                    else -> R.attr.startStopButtonColor_0
+                }
+            )
+        )
+        applyCardTint(iconCardView.cardBackgroundColor?.defaultColor ?: ViewUtils.resolveColor(context, R.attr.startStopButtonColor_0))
         invalidate()
     }
 

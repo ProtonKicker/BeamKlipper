@@ -15,8 +15,8 @@ import ru.ytkab0bp.beamklipper.utils.ViewUtils
 
 class StartStopButton : AppCompatImageView {
     companion object {
-        private const val DEFAULT_RADIUS = 30
-        private const val MIN_RADIUS = 14
+        private const val DEFAULT_RADIUS = 32
+        private const val MIN_RADIUS = 16
     }
 
     private val backgroundPaint = Paint()
@@ -31,6 +31,7 @@ class StartStopButton : AppCompatImageView {
     constructor(context: Context, attrs: AttributeSet?) : super(context, attrs) {
         setImageResource(R.drawable.ic_play_28)
         setWillNotDraw(false)
+        backgroundPaint.isAntiAlias = true
         background = ViewUtils.createRipple(
             ViewUtils.resolveColor(context, android.R.attr.colorControlHighlight), MIN_RADIUS.toFloat())
         colorFilter = PorterDuffColorFilter(
@@ -57,20 +58,18 @@ class StartStopButton : AppCompatImageView {
     }
 
     override fun draw(canvas: Canvas) {
-        path.rewind()
         val rad = ViewUtils.dp(ViewUtils.lerp(DEFAULT_RADIUS.toFloat(), MIN_RADIUS.toFloat(), progress)).toFloat()
-        path.addRoundRect(0f, 0f, width.toFloat(), height.toFloat(), rad, rad, Path.Direction.CW)
-        canvas.save()
-        canvas.clipPath(path)
-        canvas.drawPaint(backgroundPaint)
+        canvas.drawRoundRect(0f, 0f, width.toFloat(), height.toFloat(), rad, rad, backgroundPaint)
         canvas.save()
         val sc = if (progress < 0.5f) 1f - progress else progress
         canvas.scale(sc, sc, width / 2f, height / 2f)
         mDrawable?.bounds = Rect(paddingLeft, paddingTop, width - paddingRight, height - paddingBottom)
         mDrawable?.draw(canvas)
         canvas.restore()
-        super.draw(canvas)
-        canvas.restore()
+        background?.apply {
+            setBounds(0, 0, width, height)
+            draw(canvas)
+        }
     }
 
     override fun setImageResource(resId: Int) {

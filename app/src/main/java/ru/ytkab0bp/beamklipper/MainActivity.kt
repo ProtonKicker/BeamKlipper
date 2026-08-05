@@ -10,15 +10,18 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.hardware.usb.UsbManager
 import android.net.Uri
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.DocumentsContract
 import android.provider.Settings
 import android.text.TextUtils
+import android.text.format.Formatter
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
@@ -46,6 +49,7 @@ import com.hoho.android.usbserial.driver.UsbSerialProber
 import ru.ytkab0bp.beamklipper.events.*
 import ru.ytkab0bp.beamklipper.serial.KlipperProbeTable
 import ru.ytkab0bp.beamklipper.serial.UsbSerialManager
+import ru.ytkab0bp.beamklipper.service.WebService
 import ru.ytkab0bp.beamklipper.utils.Prefs
 import ru.ytkab0bp.beamklipper.utils.ViewUtils
 import ru.ytkab0bp.beamklipper.view.*
@@ -63,8 +67,6 @@ class MainActivity : AppCompatActivity() {
         private const val REQUEST_NOTIFICATIONS = 100
         private const val VIEW_TYPE_HEADER = 0
         private const val VIEW_TYPE_INSTANCE = 1
-        private const val VIEW_TYPE_NEW = 2
-        private const val VIEW_TYPE_WEB = 3
         private val NOTIFY_LIVE = Any()
     }
 
@@ -73,6 +75,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var resizeFrame: SmoothResizeFrameLayout
     private lateinit var listView: RecyclerView
     private var instances = mutableListOf<KlipperInstance>()
+    private var visibleInstances: List<KlipperInstance> = emptyList()
+    private var searchQuery: String = ""
+    private lateinit var instancesAdapter: RecyclerView.Adapter<RecyclerView.ViewHolder>
 
     private var newOrEditAnimation: SpringAnimation? = null
     private lateinit var newOrEditLayout: LinearLayout
@@ -176,7 +181,13 @@ class MainActivity : AppCompatActivity() {
 
         listCardView = MaterialCardView(this).apply {
             setStrokeColor(0)
-            setCardBackgroundColor(ViewUtils.resolveColor(this@MainActivity, R.attr.cardOutlineColor))
+            setCardBackgroundColor(
+                ViewUtils.resolveColor(
+                    this@MainActivity,
+                    com.google.android.material.R.attr.colorSurfaceContainerLow
+                )
+            )
+            cardElevation = ViewUtils.dp(1).toFloat()
             radius = ViewUtils.dp(32).toFloat()
         }
 
@@ -187,71 +198,21 @@ class MainActivity : AppCompatActivity() {
 
         resizeFrame = SmoothResizeFrameLayout(this)
 
-        val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = ViewUtils.resolveColor(this@MainActivity, R.attr.dividerColor)
-            style = Paint.Style.STROKE
-            strokeWidth = ViewUtils.dp(1f).toFloat()
-        }
-
         listView = RecyclerView(this).apply {
             overScrollMode = View.OVER_SCROLL_NEVER
             layoutManager = LinearLayoutManager(this@MainActivity)
             itemAnimator = SmoothItemAnimator()
-            addItemDecoration(object : RecyclerView.ItemDecoration() {
-                override fun onDraw(c: Canvas, parent: RecyclerView, state: RecyclerView.State) {
-                    for (i in 0 until parent.childCount) {
-                        val child = parent.getChildAt(i)
-                        val itemCountVal = adapter?.itemCount ?: continue
-                        if (parent.getChildViewHolder(child).adapterPosition != itemCountVal - 1) {
-                            c.drawLine(
-                                ViewUtils.dp(1.5f).toFloat(), child.y + child.height - ViewUtils.dp(1),
-                                (child.width - ViewUtils.dp(1.5f)).toFloat(), child.y + child.height - ViewUtils.dp(1),
-                                dividerPaint
-                            )
-                        }
-                    }
-                }
-            })
         }
         homeView.setScrollView(listView)
-        listView.adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+        instancesAdapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
                 val v: View = when (viewType) {
                     VIEW_TYPE_HEADER -> {
-                        TextView(this@MainActivity).apply {
-                            setTextColor(ViewUtils.resolveColor(this@MainActivity, android.R.attr.textColorPrimary))
-                            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
-                            typeface = ViewUtils.getTypeface(ViewUtils.ROBOTO_MEDIUM)
-                            gravity = Gravity.CENTER
-                            setText(R.string.Instances)
-                            setPadding(ViewUtils.dp(12), 0, ViewUtils.dp(12), 0)
-                            layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(52))
+                        MainHeaderView(this@MainActivity).apply {
+                            layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
                         }
                     }
-                    VIEW_TYPE_WEB, VIEW_TYPE_INSTANCE -> KlipperInstanceView(this@MainActivity)
-                    VIEW_TYPE_NEW -> {
-                        LinearLayout(this@MainActivity).apply {
-                            orientation = LinearLayout.HORIZONTAL
-                            gravity = Gravity.CENTER
-                            background = ViewUtils.resolveDrawable(this@MainActivity, android.R.attr.selectableItemBackground)
-                            setPadding(0, ViewUtils.dp(16), 0, ViewUtils.dp(16))
-                            layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(52))
-
-                            addView(ImageView(this@MainActivity).apply {
-                                setImageResource(R.drawable.ic_add_outline_28)
-                                setColorFilter(ViewUtils.resolveColor(this@MainActivity, android.R.attr.textColorSecondary))
-                            }, LinearLayout.LayoutParams(ViewUtils.dp(22), ViewUtils.dp(22)).apply {
-                                marginEnd = ViewUtils.dp(8)
-                            })
-
-                            addView(TextView(this@MainActivity).apply {
-                                setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-                                setTextColor(ViewUtils.resolveColor(this@MainActivity, android.R.attr.textColorPrimary))
-                                setText(R.string.NewInstance)
-                                gravity = Gravity.CENTER
-                            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-                        }
-                    }
+                    VIEW_TYPE_INSTANCE -> KlipperInstanceView(this@MainActivity)
                     else -> throw IllegalStateException("Unknown viewType: $viewType")
                 }
                 return object : RecyclerView.ViewHolder(v) {}
@@ -261,7 +222,7 @@ class MainActivity : AppCompatActivity() {
             override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int, payloads: MutableList<Any>) {
                 if (payloads.contains(NOTIFY_LIVE)) {
                     val view = holder.itemView as KlipperInstanceView
-                    view.bind(instances[position - 2])
+                    view.bind(visibleInstances[position - 1])
                     return
                 }
                 super.onBindViewHolder(holder, position, payloads)
@@ -269,11 +230,24 @@ class MainActivity : AppCompatActivity() {
 
             override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
                 when (getItemViewType(position)) {
+                    VIEW_TYPE_HEADER -> {
+                        val header = holder.itemView as MainHeaderView
+                        header.setCallbacks(
+                            onQueryChanged = { q ->
+                                searchQuery = q
+                                applyFilter()
+                            },
+                            onOpenWeb = { openWebFrontend() },
+                            onAddInstance = { openNewInstanceSheet() },
+                            onOpenSettings = { homeView.animateTo(-1f) }
+                        )
+                        bindHeader(header)
+                    }
                     VIEW_TYPE_INSTANCE -> {
                         val view = holder.itemView as KlipperInstanceView
-                        view.bind(instances[position - 2])
+                        view.bind(visibleInstances[position - 1])
                         view.setOnClickListener {
-                            val inst = instances[position - 2]
+                            val inst = visibleInstances[position - 1]
                             newOrEditTitle.setText(R.string.EditInstance)
                             editInstance = inst
                             editOpenDirectoryRow.visibility = View.VISIBLE
@@ -284,7 +258,7 @@ class MainActivity : AppCompatActivity() {
                             newOrEditContinue.setText(R.string.InstanceOK)
                         }
                         view.setOnLongClickListener {
-                            val inst = instances[position - 2]
+                            val inst = visibleInstances[position - 1]
                             MaterialAlertDialogBuilder(this@MainActivity)
                                 .setTitle(getString(R.string.InstanceDelete, inst.name))
                                 .setMessage(R.string.InstanceDeleteConfirm)
@@ -298,40 +272,26 @@ class MainActivity : AppCompatActivity() {
                             true
                         }
                     }
-                    VIEW_TYPE_WEB -> {
-                        val view = holder.itemView as KlipperInstanceView
-                        view.bindWeb()
-                    }
-                    VIEW_TYPE_NEW -> {
-                        holder.itemView.setOnClickListener {
-                            newOrEditTitle.setText(R.string.NewInstance)
-                            editInstance = null
-                            editOpenDirectoryRow.visibility = View.GONE
-                            autostartRow.bind(getString(R.string.Autostart), null, false)
-                            nameRow.bind(R.string.InstanceName, null)
-                            configRow.apply {
-                                bind(R.string.InstanceConfig, null)
-                                visibility = View.VISIBLE
-                            }
-                            newOrEditContinue.setText(R.string.InstanceCreate)
-                            animateNewOrEditLayout(true)
-                        }
-                    }
                 }
             }
 
             override fun getItemViewType(position: Int): Int {
                 return when (position) {
                     0 -> VIEW_TYPE_HEADER
-                    1 -> VIEW_TYPE_WEB
-                    itemCount - 1 -> VIEW_TYPE_NEW
                     else -> VIEW_TYPE_INSTANCE
                 }
             }
 
-            override fun getItemCount(): Int = instances.size + 3
+            override fun getItemCount(): Int = visibleInstances.size + 1
         }
+        listView.adapter = instancesAdapter
         resizeFrame.addView(listView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+
+        val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = ViewUtils.resolveColor(this@MainActivity, R.attr.dividerColor)
+            style = Paint.Style.STROKE
+            strokeWidth = ViewUtils.dp(1f).toFloat()
+        }
 
         newOrEditLayout = object : LinearLayout(this@MainActivity) {
             init {
@@ -707,7 +667,7 @@ class MainActivity : AppCompatActivity() {
                 if (!isFirst) return super.onKeyDown(keyCode, event)
 
                 homeView.animateTo(0f) {
-                    listView.getChildAt(2 + (if (KlipperInstance.isWebServerRunning()) 1 else 0)).requestFocus()
+                    listView.getChildAt(1)?.requestFocus()
                 }
                 return true
             }
@@ -729,12 +689,75 @@ class MainActivity : AppCompatActivity() {
     @EventHandler(runOnMainThread = true)
     fun onInstancesRefreshed(e: InstancesRefreshedEvent) {
         instances = ArrayList(KlipperInstance.getInstances())
-        listView.adapter?.notifyDataSetChanged()
+        applyFilter()
     }
 
     @EventHandler(runOnMainThread = true)
     fun onFrontendChanged(e: WebFrontendChangedEvent) {
-        listView.adapter?.notifyItemChanged(1)
+        listView.adapter?.notifyItemChanged(0)
+    }
+
+    @EventHandler(runOnMainThread = true)
+    fun onWebStateChanged(e: WebStateChangedEvent) {
+        listView.adapter?.notifyItemChanged(0)
+    }
+
+    @EventHandler(runOnMainThread = true)
+    fun onInstanceStateChanged(e: InstanceStateChangedEvent) {
+        val idx = visibleInstances.indexOfFirst { it.id == e.id }
+        if (idx >= 0) {
+            listView.adapter?.notifyItemChanged(idx + 1, NOTIFY_LIVE)
+        }
+    }
+
+    private fun applyFilter() {
+        val q = searchQuery.trim().lowercase(Locale.ROOT)
+        visibleInstances = if (q.isEmpty()) instances else instances.filter { it.name.lowercase(Locale.ROOT).contains(q) }
+        listView.adapter?.notifyDataSetChanged()
+    }
+
+    private fun openNewInstanceSheet() {
+        newOrEditTitle.setText(R.string.NewInstance)
+        editInstance = null
+        editOpenDirectoryRow.visibility = View.GONE
+        autostartRow.bind(getString(R.string.Autostart), null, false)
+        nameRow.bind(R.string.InstanceName, null)
+        configRow.apply {
+            bind(R.string.InstanceConfig, null)
+            visibility = View.VISIBLE
+        }
+        newOrEditContinue.setText(R.string.InstanceCreate)
+        animateNewOrEditLayout(true)
+    }
+
+    private fun openWebFrontend() {
+        val wm = KlipperApp.INSTANCE.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        val i = wm.connectionInfo.ipAddress
+        val ip = if (i == 0 || !KlipperInstance.isWebServerRunning()) "127.0.0.1" else Formatter.formatIpAddress(i)
+        val t = System.currentTimeMillis()
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("http://$ip:${WebService.PORT}/?t=$t"))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        startActivity(intent)
+    }
+
+    private fun bindHeader(header: MainHeaderView) {
+        val webTitle = when (Prefs.webFrontend) {
+            Prefs.FRONTEND_FLUIDD -> getString(R.string.Fluidd)
+            else -> getString(R.string.Mainsail)
+        }
+        val isWebRunning = KlipperInstance.isWebServerRunning()
+        val webSubtitle = if (isWebRunning) {
+            val wm = KlipperApp.INSTANCE.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            getString(R.string.IPInfo, Formatter.formatIpAddress(wm.connectionInfo.ipAddress), WebService.PORT)
+        } else {
+            getString(R.string.web_tile_offline)
+        }
+        header.bind(
+            webTitle = webTitle,
+            webSubtitle = webSubtitle,
+            isWebEnabled = isWebRunning,
+            instancesSubtitle = getString(R.string.Instances) + " • " + instances.size
+        )
     }
 
     private fun animateNewOrEditLayout(visible: Boolean) {
@@ -767,7 +790,7 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     newOrEditLayout.visibility = View.GONE
                     resizeFrame.removeForceNotMeasure(newOrEditLayout)
-                    listView.getChildAt(2 + (if (KlipperInstance.isWebServerRunning()) 1 else 0)).requestFocus()
+                    listView.getChildAt(1)?.requestFocus()
                     editInstance = null
                 }
                 newOrEditAnimation = null

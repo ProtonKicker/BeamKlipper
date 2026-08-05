@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="cardOutlineColor">#212121</color>
-    <color name="navigationBarColor">#212121</color>
-    <color name="windowBackground">#121212</color>
-    <color name="dividerColor">#20ffffff</color>
+    <color name="beam_lavender_primary">#D8CEFF</color>
+    <color name="beam_lavender_on_primary">#2B2344</color>
+    <color name="beam_lavender_primary_container">#4A3D73</color>
+    <color name="beam_lavender_on_primary_container">#F2EEFF</color>
 </resources>
