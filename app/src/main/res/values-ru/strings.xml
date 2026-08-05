@@ -23,6 +23,7 @@
     <string name="InstanceName">Имя</string>
     <string name="InstanceConfig">Конфиг</string>
     <string name="InstanceCreate">Создать</string>
+    <string name="InstanceConfigHint">Нажмите для выбора конфига…</string>
     <string name="InstanceDelete">Удалить «%s»?</string>
     <string name="InstanceDeleteConfirm">Вы уверены?</string>
     <string name="InstanceOK">ОК</string>
@@ -71,4 +72,21 @@
     <string name="Changelog">Список изменений</string>
     <string name="ChangelogNext">Далее</string>
     <string name="ChangelogOK">ОК</string>
+
+    <string name="AppTheme">Тема приложения</string>
+    <string name="ThemeSystem">Следовать системе</string>
+    <string name="ThemeLight">Светлая</string>
+    <string name="ThemeDark">Тёмная</string>
+
+    <string name="HelpTitle">Помощь и о программе</string>
+    <string name="About">О Beam Klipper</string>
+    <string name="IntroTitle">Как пользоваться</string>
+    <string name="IntroText">Beam Klipper превращает ваш Android-телефон в автономный блок управления 3D-принтером на базе Klipper или Kalico.\n\n1. Нажмите «+», чтобы создать профиль принтера и выбрать шаблон конфига Klipper.\n2. Нажмите кремовую кнопку Пуск, чтобы запустить движок, Moonraker и веб-сервер.\n3. Откройте Fluidd или Mainsail через карточку веб-интерфейса для управления принтером.\n4. Используйте панель настроек для переключения движков (Klipper/Kalico), фронтендов, языка и темы.\n\nВся обработка происходит локально на вашем устройстве — облако не требуется.</string>
+    <string name="GitHubRepo">Репозиторий GitHub</string>
+    <string name="AppSettings">Настройки приложения</string>
+    <string name="EngineFrontend">Движок и веб-интерфейс</string>
+    <string name="QuickStart">Быстрый старт</string>
+    <string name="PrivacyNote">Всё работает на вашем устройстве. Данные не покидают ваш телефон.</string>
+    <string name="SelectIcon">Выберите иконку</string>
+    <string name="Done">Готово</string>
 </resources>

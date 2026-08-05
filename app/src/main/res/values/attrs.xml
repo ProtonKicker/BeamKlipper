@@ -17,4 +17,10 @@
     <attr name="startStopButtonColor_9" format="color|reference"/>
     <attr name="startStopButtonForegroundColor" format="color|reference"/>
     <attr name="textColorDanger" format="color|reference"/>
+    <attr name="colorPrimary" format="color|reference"/>
+    <attr name="colorOnPrimary" format="color|reference"/>
+    <attr name="colorPrimaryContainer" format="color|reference"/>
+    <attr name="colorOnPrimaryContainer" format="color|reference"/>
+    <attr name="colorSurfaceContainerLow" format="color|reference"/>
+    <attr name="colorSurfaceContainerHigh" format="color|reference"/>
 </resources>

@@ -12,9 +12,7 @@ enum class InstanceIcon(@JvmField val drawable: Int) {
     LOCATION(R.drawable.ic_location_outline_28),
     ROBOT(R.drawable.ic_robot_outline_28),
     SERVICES(R.drawable.ic_services_outline_28),
-    SHOPPING_CART(R.drawable.ic_shopping_cart_outline_28),
-    TRUCK(R.drawable.ic_truck_outline_28),
-    SNEAKER(R.drawable.ic_sneaker_outline_28);
+    SHOPPING_CART(R.drawable.ic_shopping_cart_outline_28);
 
     companion object {
         @JvmStatic

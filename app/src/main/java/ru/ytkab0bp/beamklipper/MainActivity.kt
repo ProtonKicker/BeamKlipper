@@ -9,24 +9,18 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.Typeface
 import android.hardware.usb.UsbManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.DocumentsContract
 import android.provider.Settings
-import android.text.TextUtils
-import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
-import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -35,6 +29,8 @@ import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import androidx.core.widget.NestedScrollView
 import androidx.dynamicanimation.animation.FloatValueHolder
 import androidx.dynamicanimation.animation.SpringAnimation
 import androidx.dynamicanimation.animation.SpringForce
@@ -43,48 +39,44 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.hoho.android.usbserial.driver.UsbSerialProber
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import ru.ytkab0bp.beamklipper.events.*
 import ru.ytkab0bp.beamklipper.serial.KlipperProbeTable
 import ru.ytkab0bp.beamklipper.serial.UsbSerialManager
 import ru.ytkab0bp.beamklipper.utils.Prefs
 import ru.ytkab0bp.beamklipper.utils.ViewUtils
 import ru.ytkab0bp.beamklipper.view.*
-import ru.ytkab0bp.beamklipper.view.preferences.PreferenceSwitchView
 import ru.ytkab0bp.eventbus.EventHandler
 import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.util.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     companion object {
         private const val REQUEST_NOTIFICATIONS = 100
-        private const val VIEW_TYPE_HEADER = 0
+        private const val REQUEST_CAMERA = 200
+        private const val VIEW_TYPE_WEB = 0
         private const val VIEW_TYPE_INSTANCE = 1
-        private const val VIEW_TYPE_NEW = 2
-        private const val VIEW_TYPE_WEB = 3
         private val NOTIFY_LIVE = Any()
     }
 
     private lateinit var homeView: HomeView
-    private lateinit var listCardView: MaterialCardView
-    private lateinit var resizeFrame: SmoothResizeFrameLayout
-    private lateinit var listView: RecyclerView
+    private lateinit var mainPage: FrameLayout
+    private lateinit var badgesLayout: FrameLayout
+    private lateinit var gearBtn: MaterialCardView
+    private lateinit var helpBtn: MaterialCardView
+
+    private lateinit var instancesRecycler: RecyclerView
+    private lateinit var instancesAdapter: RecyclerView.Adapter<*>
     private var instances = mutableListOf<KlipperInstance>()
 
-    private var newOrEditAnimation: SpringAnimation? = null
-    private lateinit var newOrEditLayout: LinearLayout
-    private lateinit var newOrEditTitle: TextView
-    private var editInstance: KlipperInstance? = null
-    private lateinit var nameRow: EditTextRowView
-    private lateinit var configRow: EditTextRowView
-    private lateinit var editOpenDirectoryRow: TextView
-    private lateinit var autostartRow: PreferenceSwitchView
-    private lateinit var newOrEditContinue: TextView
+    private lateinit var addButton: MaterialCardView
+    private lateinit var runStopButton: MaterialCardView
+    private lateinit var addIcon: ImageView
+    private lateinit var runStopIcon: ImageView
+    private lateinit var bottomButtonsWrap: FrameLayout
 
     private lateinit var preferencesView: PreferencesCardView
+    private lateinit var helpView: HelpView
 
     private lateinit var noPermsLayout: MaterialCardView
     private lateinit var batteryRow: PermissionRowView
@@ -92,13 +84,10 @@ class MainActivity : AppCompatActivity() {
     private var hideServicesChannelRow: PermissionRowView? = null
     private var brokenBySDCardRow: PermissionRowView? = null
 
-    private lateinit var logoView: ImageView
-    private lateinit var titleView: TextView
-    private lateinit var badgesLayout: FrameLayout
-    private var refBadges: Array<RefBadgeView?> = emptyArray()
-
     private var isTV = false
     private var isCurrentLauncher = false
+
+    private var selectedInstanceForToggle: KlipperInstance? = null
 
     @SuppressLint("BatteryLife", "InlinedApi")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -115,16 +104,48 @@ class MainActivity : AppCompatActivity() {
             isTV = true
             PermissionsChecker.setIgnoreNotificationsChannel(true)
         }
-        if (Build.MANUFACTURER.lowercase(Locale.ROOT).contains("meizu") ||
-            Build.BRAND.lowercase(Locale.ROOT).contains("meizu")
+        if (Build.MANUFACTURER.lowercase(java.util.Locale.ROOT).contains("meizu") ||
+            Build.BRAND.lowercase(java.util.Locale.ROOT).contains("meizu")
         ) {
             PermissionsChecker.setIgnoreNotificationsChannel(true)
         }
         isCurrentLauncher = intent?.categories?.contains(Intent.CATEGORY_HOME) == true
 
-        val fl = FrameLayout(this)
-
+        val root = FrameLayout(this)
         homeView = HomeView(this)
+        buildSettingsHelpPages()
+        buildMainPage()
+        homeView.setProgressListener { invalidateHomeProgress(it) }
+        root.addView(homeView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        buildPermissionScreen(root)
+        root.setBackgroundColor(ViewUtils.resolveColor(this, android.R.attr.windowBackground))
+        setContentView(root)
+
+        processIntent(intent)
+        instances = ArrayList(KlipperInstance.getInstances())
+        instancesAdapter.notifyDataSetChanged()
+        refreshBottomButtons()
+        KlipperApp.EVENT_BUS.registerListener(this)
+
+        if (Prefs.getLastCommit() != BuildConfig.COMMIT && KlipperApp.hasUpdateInfo) {
+            Prefs.setLastCommit()
+            ChangeLogBottomSheet(this@MainActivity).show()
+        }
+
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (homeView.progress != HomeView.PAGE_MAIN) {
+                    homeView.animateTo(HomeView.PAGE_MAIN)
+                    return
+                }
+                isEnabled = false
+                onBackPressedDispatcher.onBackPressed()
+            }
+        })
+    }
+
+    private fun buildMainPage() {
+        mainPage = FrameLayout(this)
 
         badgesLayout = object : FrameLayout(this) {
             override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -135,123 +156,48 @@ class MainActivity : AppCompatActivity() {
             clipChildren = false
             clipToPadding = false
         }
+        mainPage.addView(badgesLayout, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
 
-        fl.setOnApplyWindowInsetsListener { v, insets ->
-            badgesLayout.setPadding(insets.systemWindowInsetLeft, insets.systemWindowInsetTop, insets.systemWindowInsetRight, insets.systemWindowInsetBottom)
-            preferencesView.setPadding(insets.systemWindowInsetLeft, 0, insets.systemWindowInsetRight, insets.systemWindowInsetBottom)
-            val params = listCardView.layoutParams as ViewGroup.MarginLayoutParams
-            params.leftMargin = ViewUtils.dp(21) + insets.systemWindowInsetLeft
-            params.topMargin = ViewUtils.dp(64) + insets.systemWindowInsetTop
-            params.rightMargin = ViewUtils.dp(21) + insets.systemWindowInsetRight
-            params.bottomMargin = ViewUtils.dp(72) + insets.systemWindowInsetBottom
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                params.bottomMargin -= insets.getInsets(WindowInsets.Type.ime()).bottom / 2
-            } else if (insets.systemWindowInsetBottom >= ViewUtils.dp(20)) {
-                params.bottomMargin -= insets.systemWindowInsetBottom / 2
-            }
-            listCardView.requestLayout()
-            insets
+        gearBtn = buildTopTile(R.drawable.ic_settings_outline_28).apply {
+            setOnClickListener { homeView.animateTo(HomeView.PAGE_SETTINGS) }
         }
-
-        logoView = ImageView(this).apply {
-            setImageResource(R.drawable.icon_logo)
-        }
-        badgesLayout.addView(logoView, FrameLayout.LayoutParams(ViewUtils.dp(28), ViewUtils.dp(28)).apply {
-            topMargin = ViewUtils.dp(6)
-            leftMargin = ViewUtils.dp(9)
+        badgesLayout.addView(gearBtn, FrameLayout.LayoutParams(ViewUtils.dp(44), ViewUtils.dp(44)).apply {
+            gravity = Gravity.TOP or Gravity.START
+            topMargin = ViewUtils.dp(10)
+            leftMargin = ViewUtils.dp(16)
         })
 
-        titleView = TextView(this).apply {
+        helpBtn = buildTopTile(R.drawable.ic_help_outline_28).apply {
+            setOnClickListener { homeView.animateTo(HomeView.PAGE_HELP) }
+        }
+        badgesLayout.addView(helpBtn, FrameLayout.LayoutParams(ViewUtils.dp(44), ViewUtils.dp(44)).apply {
+            gravity = Gravity.TOP or Gravity.END
+            topMargin = ViewUtils.dp(10)
+            rightMargin = ViewUtils.dp(16)
+        })
+
+        val titleTv = TextView(this).apply {
             setText(R.string.AppName)
-            gravity = Gravity.CENTER_VERTICAL
-            setTextColor(ViewUtils.resolveColor(this@MainActivity, android.R.attr.colorAccent))
-            typeface = Typeface.DEFAULT_BOLD
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
+            setTextColor(ViewUtils.resolveColor(this@MainActivity, android.R.attr.textColorPrimary))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+            typeface = ViewUtils.getTypeface(ViewUtils.ROBOTO_MEDIUM)
         }
-        badgesLayout.addView(titleView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewUtils.dp(22 + 18)).apply {
-            leftMargin = ViewUtils.dp(9 + 28 + 12)
-            rightMargin = ViewUtils.dp(9)
+        badgesLayout.addView(titleTv, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            topMargin = ViewUtils.dp(18)
         })
-        buildBadges()
 
-        listCardView = MaterialCardView(this).apply {
-            setStrokeColor(0)
-            setCardBackgroundColor(ViewUtils.resolveColor(this@MainActivity, R.attr.cardOutlineColor))
-            radius = ViewUtils.dp(32).toFloat()
-        }
-
-        preferencesView = PreferencesCardView(this).apply {
-            header.setOnClickListener { homeView.animateTo(-1f) }
-        }
-        homeView.setProgressListener { invalidateHomeProgress(it) }
-
-        resizeFrame = SmoothResizeFrameLayout(this)
-
-        val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = ViewUtils.resolveColor(this@MainActivity, R.attr.dividerColor)
-            style = Paint.Style.STROKE
-            strokeWidth = ViewUtils.dp(1f).toFloat()
-        }
-
-        listView = RecyclerView(this).apply {
+        instancesRecycler = RecyclerView(this).apply {
             overScrollMode = View.OVER_SCROLL_NEVER
             layoutManager = LinearLayoutManager(this@MainActivity)
             itemAnimator = SmoothItemAnimator()
-            addItemDecoration(object : RecyclerView.ItemDecoration() {
-                override fun onDraw(c: Canvas, parent: RecyclerView, state: RecyclerView.State) {
-                    for (i in 0 until parent.childCount) {
-                        val child = parent.getChildAt(i)
-                        val itemCountVal = adapter?.itemCount ?: continue
-                        if (parent.getChildViewHolder(child).adapterPosition != itemCountVal - 1) {
-                            c.drawLine(
-                                ViewUtils.dp(1.5f).toFloat(), child.y + child.height - ViewUtils.dp(1),
-                                (child.width - ViewUtils.dp(1.5f)).toFloat(), child.y + child.height - ViewUtils.dp(1),
-                                dividerPaint
-                            )
-                        }
-                    }
-                }
-            })
+            clipToPadding = false
         }
-        homeView.setScrollView(listView)
-        listView.adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+        homeView.setScrollView(instancesRecycler)
+        instancesAdapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
                 val v: View = when (viewType) {
-                    VIEW_TYPE_HEADER -> {
-                        TextView(this@MainActivity).apply {
-                            setTextColor(ViewUtils.resolveColor(this@MainActivity, android.R.attr.textColorPrimary))
-                            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
-                            typeface = ViewUtils.getTypeface(ViewUtils.ROBOTO_MEDIUM)
-                            gravity = Gravity.CENTER
-                            setText(R.string.Instances)
-                            setPadding(ViewUtils.dp(12), 0, ViewUtils.dp(12), 0)
-                            layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(52))
-                        }
-                    }
                     VIEW_TYPE_WEB, VIEW_TYPE_INSTANCE -> KlipperInstanceView(this@MainActivity)
-                    VIEW_TYPE_NEW -> {
-                        LinearLayout(this@MainActivity).apply {
-                            orientation = LinearLayout.HORIZONTAL
-                            gravity = Gravity.CENTER
-                            background = ViewUtils.resolveDrawable(this@MainActivity, android.R.attr.selectableItemBackground)
-                            setPadding(0, ViewUtils.dp(16), 0, ViewUtils.dp(16))
-                            layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(52))
-
-                            addView(ImageView(this@MainActivity).apply {
-                                setImageResource(R.drawable.ic_add_outline_28)
-                                setColorFilter(ViewUtils.resolveColor(this@MainActivity, android.R.attr.textColorSecondary))
-                            }, LinearLayout.LayoutParams(ViewUtils.dp(22), ViewUtils.dp(22)).apply {
-                                marginEnd = ViewUtils.dp(8)
-                            })
-
-                            addView(TextView(this@MainActivity).apply {
-                                setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-                                setTextColor(ViewUtils.resolveColor(this@MainActivity, android.R.attr.textColorPrimary))
-                                setText(R.string.NewInstance)
-                                gravity = Gravity.CENTER
-                            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-                        }
-                    }
                     else -> throw IllegalStateException("Unknown viewType: $viewType")
                 }
                 return object : RecyclerView.ViewHolder(v) {}
@@ -259,38 +205,33 @@ class MainActivity : AppCompatActivity() {
 
             @Suppress("UNCHECKED_CAST")
             override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int, payloads: MutableList<Any>) {
-                if (payloads.contains(NOTIFY_LIVE)) {
+                if (payloads.contains(NOTIFY_LIVE) && getItemViewType(position) == VIEW_TYPE_INSTANCE) {
                     val view = holder.itemView as KlipperInstanceView
-                    view.bind(instances[position - 2])
+                    view.bind(instances[position - 1])
                     return
                 }
                 super.onBindViewHolder(holder, position, payloads)
             }
 
             override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+                val view = holder.itemView as KlipperInstanceView
                 when (getItemViewType(position)) {
+                    VIEW_TYPE_WEB -> {
+                        view.bindWeb()
+                    }
                     VIEW_TYPE_INSTANCE -> {
-                        val view = holder.itemView as KlipperInstanceView
-                        view.bind(instances[position - 2])
+                        val inst = instances[position - 1]
+                        view.bind(inst)
                         view.setOnClickListener {
-                            val inst = instances[position - 2]
-                            newOrEditTitle.setText(R.string.EditInstance)
-                            editInstance = inst
-                            editOpenDirectoryRow.visibility = View.VISIBLE
-                            autostartRow.bind(getString(R.string.Autostart), null, inst.autostart)
-                            nameRow.bind(R.string.InstanceName, inst.name)
-                            configRow.visibility = View.GONE
-                            animateNewOrEditLayout(true)
-                            newOrEditContinue.setText(R.string.InstanceOK)
+                            InstanceEditorBottomSheet.show(this@MainActivity, inst)
                         }
                         view.setOnLongClickListener {
-                            val inst = instances[position - 2]
                             MaterialAlertDialogBuilder(this@MainActivity)
                                 .setTitle(getString(R.string.InstanceDelete, inst.name))
                                 .setMessage(R.string.InstanceDeleteConfirm)
                                 .setNegativeButton(android.R.string.cancel, null)
                                 .setPositiveButton(android.R.string.ok) { _, _ ->
-                                    KlipperApp.appScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                    KlipperApp.appScope.launch(Dispatchers.IO) {
                                         KlipperApp.DATABASE.delete(inst)
                                     }
                                 }
@@ -298,250 +239,151 @@ class MainActivity : AppCompatActivity() {
                             true
                         }
                     }
-                    VIEW_TYPE_WEB -> {
-                        val view = holder.itemView as KlipperInstanceView
-                        view.bindWeb()
-                    }
-                    VIEW_TYPE_NEW -> {
-                        holder.itemView.setOnClickListener {
-                            newOrEditTitle.setText(R.string.NewInstance)
-                            editInstance = null
-                            editOpenDirectoryRow.visibility = View.GONE
-                            autostartRow.bind(getString(R.string.Autostart), null, false)
-                            nameRow.bind(R.string.InstanceName, null)
-                            configRow.apply {
-                                bind(R.string.InstanceConfig, null)
-                                visibility = View.VISIBLE
-                            }
-                            newOrEditContinue.setText(R.string.InstanceCreate)
-                            animateNewOrEditLayout(true)
-                        }
-                    }
                 }
             }
 
-            override fun getItemViewType(position: Int): Int {
-                return when (position) {
-                    0 -> VIEW_TYPE_HEADER
-                    1 -> VIEW_TYPE_WEB
-                    itemCount - 1 -> VIEW_TYPE_NEW
-                    else -> VIEW_TYPE_INSTANCE
-                }
-            }
-
-            override fun getItemCount(): Int = instances.size + 3
+            override fun getItemCount(): Int = instances.size + 1
+            override fun getItemViewType(position: Int): Int = if (position == 0) VIEW_TYPE_WEB else VIEW_TYPE_INSTANCE
         }
-        resizeFrame.addView(listView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        instancesRecycler.adapter = instancesAdapter
 
-        newOrEditLayout = object : LinearLayout(this@MainActivity) {
-            init {
-                setWillNotDraw(false)
-            }
+        val contentPaddingTop = ViewUtils.dp(80)
+        val contentPaddingBottom = ViewUtils.dp(200)
+        instancesRecycler.setPadding(ViewUtils.dp(20), contentPaddingTop, ViewUtils.dp(20), contentPaddingBottom)
 
-            override fun draw(canvas: Canvas) {
-                super.draw(canvas)
-                for (i in 0 until childCount - 1) {
-                    val child = getChildAt(i)
-                    if (child.visibility == View.VISIBLE) {
-                        canvas.drawLine(
-                            ViewUtils.dp(1.5f).toFloat(), child.y + child.height - ViewUtils.dp(1),
-                            (child.width - ViewUtils.dp(1.5f)).toFloat(), child.y + child.height - ViewUtils.dp(1),
-                            dividerPaint
-                        )
-                    }
-                }
-            }
-        }.apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        val instancesWrap = FrameLayout(this)
+        instancesWrap.addView(instancesRecycler, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        mainPage.addView(instancesWrap, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+
+        bottomButtonsWrap = FrameLayout(this).apply {
+            id = View.generateViewId()
+            clipChildren = false
+            clipToPadding = false
         }
-
-        newOrEditTitle = TextView(this@MainActivity).apply {
-            setTextColor(ViewUtils.resolveColor(this@MainActivity, android.R.attr.textColorPrimary))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
-            typeface = ViewUtils.getTypeface(ViewUtils.ROBOTO_MEDIUM)
+        val bottomRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setPadding(ViewUtils.dp(12), 0, ViewUtils.dp(12), 0)
-            layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(52))
-            setOnClickListener { animateNewOrEditLayout(false) }
-            isFocusable = false
         }
-        newOrEditLayout.addView(newOrEditTitle)
+        val gap = ViewUtils.dp(20)
 
-        nameRow = EditTextRowView(this@MainActivity).apply {
-            setOnClickListener {
-                val frame = FrameLayout(it.context).apply {
-                    setPadding(ViewUtils.dp(21), 0, ViewUtils.dp(21), 0)
-                    val et = EditText(it.context).apply {
-                        setText(this@apply.text)
-                    }
-                    addView(et)
-                }
-                MaterialAlertDialogBuilder(it.context)
-                    .setTitle(R.string.InstanceName)
-                    .setView(frame)
-                    .setNegativeButton(android.R.string.cancel, null)
-                    .setPositiveButton(android.R.string.ok) { dialog, which ->
-                        nameRow.bind(R.string.InstanceName, (frame.getChildAt(0) as EditText).text.toString())
-                    }
-                    .show()
-            }
+        addButton = buildBigCreamButton(R.drawable.ic_add_outline_28).apply {
+            setOnClickListener { InstanceEditorBottomSheet.show(this@MainActivity, null) }
         }
-        newOrEditLayout.addView(nameRow)
-
-        configRow = EditTextRowView(this@MainActivity).apply {
-            setOnClickListener {
-                val config = File(KlipperApp.INSTANCE.filesDir, "klipper/config")
-                val filesList = config.listFiles()?.map { it.name }?.sorted() ?: emptyList()
-                MaterialAlertDialogBuilder(it.context)
-                    .setTitle(R.string.InstanceConfig)
-                    .setItems(filesList.toTypedArray()) { dialog, which -> configRow.bind(R.string.InstanceConfig, filesList[which]) }
-                    .show()
-            }
-        }
-        newOrEditLayout.addView(configRow)
-
-        editOpenDirectoryRow = TextView(this@MainActivity).apply {
-            setText(R.string.EditOpenDirectory)
-            setTextColor(ViewUtils.resolveColor(this@MainActivity, android.R.attr.textColorPrimary))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-            gravity = Gravity.START or Gravity.CENTER_VERTICAL
-            setPadding(ViewUtils.dp(21), 0, ViewUtils.dp(21), 0)
-            background = ViewUtils.resolveDrawable(this@MainActivity, android.R.attr.selectableItemBackground)
-            layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(52))
-            setOnClickListener {
-                val uri = DocumentsContract.buildRootUri("ru.ytkab0bp.beamklipper", editInstance!!.id)
-                try {
-                    try {
-                        try {
-                            startActivity(Intent("android.intent.action.VIEW").setDataAndType(uri, DocumentsContract.Document.MIME_TYPE_DIR))
-                        } catch (_: ActivityNotFoundException) {
-                            startActivity(Intent("android.provider.action.BROWSE").setDataAndType(uri, DocumentsContract.Document.MIME_TYPE_DIR))
-                        }
-                    } catch (_: ActivityNotFoundException) {
-                        startActivity(Intent("android.provider.action.BROWSE_DOCUMENT_ROOT").setDataAndType(uri, DocumentsContract.Document.MIME_TYPE_DIR))
-                    }
-                } catch (_: ActivityNotFoundException) {
-                }
-            }
-        }
-        newOrEditLayout.addView(editOpenDirectoryRow)
-
-        autostartRow = PreferenceSwitchView(this@MainActivity).apply {
-            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(52))
-            setOnClickListener { isChecked = !isChecked }
-        }
-        newOrEditLayout.addView(autostartRow)
-
-        newOrEditContinue = TextView(this@MainActivity).apply {
-            setTextColor(ViewUtils.resolveColor(this@MainActivity, android.R.attr.textColorPrimary))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-            typeface = ViewUtils.getTypeface(ViewUtils.ROBOTO_MEDIUM)
-            gravity = Gravity.CENTER
-            setPadding(ViewUtils.dp(12), 0, ViewUtils.dp(12), 0)
-            background = ViewUtils.resolveDrawable(this@MainActivity, android.R.attr.selectableItemBackground)
-            layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(52))
-            var saving = false
-            setOnClickListener {
-                if (saving) return@setOnClickListener
-                if (TextUtils.isEmpty(nameRow.text)) {
-                    MaterialAlertDialogBuilder(this@MainActivity)
-                        .setTitle(R.string.Error)
-                        .setMessage(R.string.ErrorNameEmpty)
-                        .setPositiveButton(android.R.string.ok, null)
-                        .show()
-                    return@setOnClickListener
-                }
-
-                if (editInstance != null) {
-                    val editing = editInstance!!
-                    editing.name = nameRow.text.toString().trim()
-                    editing.autostart = autostartRow.isChecked
-                    saving = true
-                    isEnabled = false
-                    KlipperApp.appScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                        try {
-                            KlipperApp.DATABASE.update(editing)
-                        } finally {
-                            runOnUiThread {
-                                saving = false
-                                isEnabled = true
-                            }
-                        }
-                    }
-                    editInstance = null
-                    animateNewOrEditLayout(false)
-                    return@setOnClickListener
-                }
-
-                if (TextUtils.isEmpty(configRow.text)) {
-                    MaterialAlertDialogBuilder(this@MainActivity)
-                        .setTitle(R.string.Error)
-                        .setMessage(R.string.ErrorConfigEmpty)
-                        .setPositiveButton(android.R.string.ok, null)
-                        .show()
-                    return@setOnClickListener
-                }
-
-                val inst = KlipperInstance().apply {
-                    id = UUID.randomUUID().toString()
-                    name = nameRow.text.toString().trim()
-                    autostart = autostartRow.isChecked
-                }
-                val cfg = File(inst.publicDirectory, "config/printer.cfg")
-                val cfgText = configRow.text.toString()
-                saving = true
-                isEnabled = false
-                KlipperApp.appScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                    try {
-                        cfg.parentFile?.mkdirs()
-                        try {
-                            FileInputStream(File(KlipperApp.INSTANCE.filesDir, "klipper/config/$cfgText")).use { fis ->
-                                FileOutputStream(cfg).use { fos ->
-                                    fis.copyTo(fos)
-                                }
-                            }
-                        } catch (e: Exception) {
-                            Log.w("MainActivity", "Failed to copy config file", e)
-                        }
-                        KlipperApp.DATABASE.insert(inst)
-                    } finally {
-                        runOnUiThread {
-                            saving = false
-                            isEnabled = true
-                        }
-                    }
-                }
-                animateNewOrEditLayout(false)
-            }
-        }
-        newOrEditLayout.addView(newOrEditContinue)
-
-        newOrEditLayout.visibility = View.GONE
-        resizeFrame.addView(newOrEditLayout)
-
-        listCardView.addView(resizeFrame, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-        homeView.addView(listCardView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER).apply {
-            leftMargin = ViewUtils.dp(21)
-            rightMargin = ViewUtils.dp(21)
-            topMargin = ViewUtils.dp(64)
-            bottomMargin = ViewUtils.dp(72)
+        addIcon = (addButton.getChildAt(0) as FrameLayout).getChildAt(0) as ImageView
+        bottomRow.addView(addButton, LinearLayout.LayoutParams(ViewUtils.dp(108), ViewUtils.dp(108)).apply {
+            marginEnd = gap
         })
+
+        runStopButton = buildBigCreamButton(R.drawable.ic_play_28).apply {
+            setOnClickListener { runStopAll() }
+        }
+        runStopIcon = (runStopButton.getChildAt(0) as FrameLayout).getChildAt(0) as ImageView
+        bottomRow.addView(runStopButton, LinearLayout.LayoutParams(ViewUtils.dp(108), ViewUtils.dp(108)))
+
+        bottomButtonsWrap.addView(bottomRow, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
+
+        mainPage.addView(bottomButtonsWrap, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewUtils.dp(108),
+            Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+        ).apply {
+            leftMargin = ViewUtils.dp(24)
+            rightMargin = ViewUtils.dp(24)
+            bottomMargin = ViewUtils.dp(60)
+        })
+
+        mainPage.setOnApplyWindowInsetsListener { _, insets ->
+            badgesLayout.setPadding(insets.systemWindowInsetLeft, insets.systemWindowInsetTop, insets.systemWindowInsetRight, 0)
+            instancesRecycler.setPadding(
+                ViewUtils.dp(20) + insets.systemWindowInsetLeft,
+                contentPaddingTop + insets.systemWindowInsetTop,
+                ViewUtils.dp(20) + insets.systemWindowInsetRight,
+                ViewUtils.dp(180) + insets.systemWindowInsetBottom
+            )
+            val lp = bottomButtonsWrap.layoutParams as FrameLayout.LayoutParams
+            lp.bottomMargin = ViewUtils.dp(60) + insets.systemWindowInsetBottom
+            lp.leftMargin = ViewUtils.dp(24) + insets.systemWindowInsetLeft
+            lp.rightMargin = ViewUtils.dp(24) + insets.systemWindowInsetRight
+            bottomButtonsWrap.layoutParams = lp
+            insets
+        }
+
+        homeView.addView(mainPage, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+    }
+
+    private fun buildTopTile(iconRes: Int): MaterialCardView {
+        val card = MaterialCardView(this).apply {
+            radius = ViewUtils.dp(20).toFloat()
+            cardElevation = 0f
+            strokeWidth = 0
+            setCardBackgroundColor(ViewUtils.resolveColor(this@MainActivity, android.R.attr.windowBackground))
+        }
+        val f = FrameLayout(this).apply {
+            background = ViewUtils.resolveDrawable(this@MainActivity, android.R.attr.selectableItemBackgroundBorderless)
+            setPadding(ViewUtils.dp(10), ViewUtils.dp(10), ViewUtils.dp(10), ViewUtils.dp(10))
+        }
+        val iv = ImageView(this).apply {
+            setImageResource(iconRes)
+            imageTintList = android.content.res.ColorStateList.valueOf(
+                ViewUtils.resolveColor(this@MainActivity, android.R.attr.textColorPrimary)
+            )
+        }
+        f.addView(iv, FrameLayout.LayoutParams(ViewUtils.dp(24), ViewUtils.dp(24), Gravity.CENTER))
+        card.addView(f)
+        return card
+    }
+
+    private fun buildBigCreamButton(iconRes: Int): MaterialCardView {
+        val card = MaterialCardView(this).apply {
+            radius = ViewUtils.dp(32).toFloat()
+            cardElevation = 0f
+            strokeWidth = 0
+            setCardBackgroundColor(ViewUtils.resolveColor(this@MainActivity, R.attr.colorPrimary))
+        }
+        val f = FrameLayout(this).apply {
+            background = ViewUtils.resolveDrawable(this@MainActivity, android.R.attr.selectableItemBackgroundBorderless)
+        }
+        val iv = ImageView(this).apply {
+            setImageResource(iconRes)
+            imageTintList = android.content.res.ColorStateList.valueOf(
+                ViewUtils.resolveColor(this@MainActivity, R.attr.colorOnPrimary)
+            )
+            scaleType = ImageView.ScaleType.FIT_CENTER
+        }
+        f.addView(iv, FrameLayout.LayoutParams(ViewUtils.dp(54), ViewUtils.dp(54), Gravity.CENTER))
+        card.addView(f, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        return card
+    }
+
+    private fun buildSettingsHelpPages() {
+        preferencesView = PreferencesCardView(this)
         homeView.addView(preferencesView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-        homeView.addView(badgesLayout, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT).apply {
-            topMargin = ViewUtils.dp(12)
-            leftMargin = ViewUtils.dp(12)
-            rightMargin = ViewUtils.dp(12)
-        })
 
-        fl.addView(homeView)
+        helpView = HelpView(this)
+        homeView.addView(helpView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+    }
 
+    private fun buildPermissionScreen(root: FrameLayout) {
         noPermsLayout = MaterialCardView(this@MainActivity).apply {
-            setCardBackgroundColor(ViewUtils.resolveColor(this@MainActivity, R.attr.cardOutlineColor))
+            setCardBackgroundColor(ViewUtils.resolveColor(this@MainActivity, R.attr.colorSurfaceContainerHigh))
             setStrokeColor(0)
             radius = ViewUtils.dp(32).toFloat()
         }
         val ll = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL }
+
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(ViewUtils.dp(24), ViewUtils.dp(20), ViewUtils.dp(24), ViewUtils.dp(8))
+        }
+        val headerTitle = TextView(this).apply {
+            setText(R.string.AppName)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+            setTextColor(ViewUtils.resolveColor(this@MainActivity, android.R.attr.textColorPrimary))
+            typeface = ViewUtils.getTypeface(ViewUtils.ROBOTO_MEDIUM)
+        }
+        header.addView(headerTitle)
+        ll.addView(header)
 
         batteryRow = PermissionRowView(this@MainActivity).apply {
             bind(R.string.BatteryOptimizationExclusion, PermissionsChecker.hasBatteryPerm(), true)
@@ -597,63 +439,105 @@ class MainActivity : AppCompatActivity() {
             ll.addView(brokenBySDCardRow)
         }
 
-        PermissionRowView(this@MainActivity).apply {
-            titleView.gravity = Gravity.CENTER
-            titleView.typeface = ViewUtils.getTypeface(ViewUtils.ROBOTO_MEDIUM)
-            titleView.setText(R.string.Next)
-            mSwitch.visibility = View.GONE
-            setPadding(paddingLeft, ViewUtils.dp(14), paddingRight, ViewUtils.dp(14))
+        val btnCard = MaterialCardView(this).apply {
+            radius = ViewUtils.dp(24).toFloat()
+            cardElevation = 0f
+            setCardBackgroundColor(ViewUtils.resolveColor(this@MainActivity, R.attr.colorPrimary))
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewUtils.dp(52)).apply {
+                setMargins(ViewUtils.dp(16), ViewUtils.dp(12), ViewUtils.dp(16), ViewUtils.dp(20))
+            }
+        }
+        val nextBtn = TextView(this@MainActivity).apply {
+            setText(R.string.Next)
+            setTextColor(ViewUtils.resolveColor(this@MainActivity, R.attr.colorOnPrimary))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            gravity = Gravity.CENTER
+            typeface = ViewUtils.getTypeface(ViewUtils.ROBOTO_MEDIUM)
+            background = ViewUtils.resolveDrawable(this@MainActivity, android.R.attr.selectableItemBackground)
             setOnClickListener {
                 if (PermissionsChecker.needBlockStart()) return@setOnClickListener
                 animateHomeView()
             }
-            ll.addView(this)
         }
+        btnCard.addView(nextBtn)
+        ll.addView(btnCard)
 
         noPermsLayout.addView(ll)
-        fl.addView(noPermsLayout, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER).apply {
-            leftMargin = ViewUtils.dp(21)
-            topMargin = ViewUtils.dp(21)
-            rightMargin = ViewUtils.dp(21)
-            bottomMargin = ViewUtils.dp(21)
+        root.addView(noPermsLayout, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER).apply {
+            leftMargin = ViewUtils.dp(20)
+            topMargin = ViewUtils.dp(20)
+            rightMargin = ViewUtils.dp(20)
+            bottomMargin = ViewUtils.dp(20)
         })
 
         noPermsLayout.visibility = if (PermissionsChecker.needBlockStart()) View.VISIBLE else View.GONE
         homeView.visibility = if (PermissionsChecker.needBlockStart()) View.GONE else View.VISIBLE
+    }
 
-        if (isTV) {
-            preferencesView.isFocusable = false
-            preferencesView.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
-            badgesLayout.isFocusable = false
-            badgesLayout.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+    private fun refreshBottomButtons() {
+        val hasInstances = instances.isNotEmpty()
+        val anyRunning = instances.any { it.getState() == KlipperInstance.State.RUNNING }
+        val anyStarting = instances.any { it.getState() == KlipperInstance.State.STARTING }
+        val active = anyRunning || anyStarting
+
+        addIcon.setImageResource(R.drawable.ic_add_outline_28)
+
+        if (active) {
+            runStopIcon.setImageResource(R.drawable.ic_stop_24)
+        } else {
+            runStopIcon.setImageResource(R.drawable.ic_play_28)
         }
 
-        fl.setBackgroundColor(ViewUtils.resolveColor(this@MainActivity, android.R.attr.windowBackground))
-        setContentView(fl)
+        val addLp = addButton.layoutParams as LinearLayout.LayoutParams
+        val runLp = runStopButton.layoutParams as LinearLayout.LayoutParams
 
-        processIntent(intent)
-        instances = ArrayList(KlipperInstance.getInstances())
-        KlipperApp.EVENT_BUS.registerListener(this)
+        if (!hasInstances) {
+            addButton.visibility = View.VISIBLE
+            runStopButton.visibility = View.GONE
+        } else {
+            addButton.visibility = View.VISIBLE
+            runStopButton.visibility = View.VISIBLE
+        }
+        addButton.requestLayout()
+        runStopButton.requestLayout()
+    }
 
-        if (Prefs.getLastCommit() != BuildConfig.COMMIT && KlipperApp.hasUpdateInfo) {
-            Prefs.setLastCommit()
-            ChangeLogBottomSheet(this@MainActivity).show()
+    private fun runStopAll() {
+        val hasInstances = instances.isNotEmpty()
+        if (!hasInstances) return
+
+        val anyRunningOrStarting = instances.any {
+            it.getState() == KlipperInstance.State.RUNNING ||
+            it.getState() == KlipperInstance.State.STARTING
         }
 
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                if (newOrEditLayout.visibility != View.GONE) {
-                    animateNewOrEditLayout(false)
-                    return
+        if (anyRunningOrStarting) {
+            for (inst in instances) {
+                if (inst.getState() == KlipperInstance.State.RUNNING || inst.getState() == KlipperInstance.State.STARTING) {
+                    if (inst.getState() != KlipperInstance.State.STOPPING) {
+                        inst.stop()
+                        if (inst.autostart) {
+                            inst.autostart = false
+                            KlipperApp.DATABASE.update(inst)
+                        }
+                    }
                 }
-                if (homeView.progress != 0f) {
-                    homeView.animateTo(0f)
-                    return
-                }
-                isEnabled = false
-                onBackPressedDispatcher.onBackPressed()
             }
-        })
+        } else {
+            for (inst in instances) {
+                if (inst.getState() == KlipperInstance.State.IDLE) {
+                    if (!KlipperInstance.hasFreeSlots()) {
+                        MaterialAlertDialogBuilder(this)
+                            .setTitle(R.string.NoFreeSlots)
+                            .setMessage(getString(R.string.NoFreeSlotsDescription, KlipperInstance.SLOTS_COUNT))
+                            .setPositiveButton(android.R.string.ok, null)
+                            .show()
+                        return
+                    }
+                    inst.start()
+                }
+            }
+        }
     }
 
     override fun onDestroy() {
@@ -661,118 +545,99 @@ class MainActivity : AppCompatActivity() {
         KlipperApp.EVENT_BUS.unregisterListener(this)
     }
 
-    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
-        if (newOrEditLayout.findFocus() != null && keyCode != KeyEvent.KEYCODE_BACK) {
-            return newOrEditLayout.onKeyUp(keyCode, event)
-        }
-        return super.onKeyUp(keyCode, event)
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (newOrEditLayout.findFocus() != null && keyCode != KeyEvent.KEYCODE_BACK) {
-            return newOrEditLayout.onKeyDown(keyCode, event)
-        }
-
-        if (event.action == KeyEvent.ACTION_DOWN) {
-            val focusInList = homeView.getTargetProgress() == 0f
-            val focusInSettings = homeView.getTargetProgress() == -1f
-
-            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                if (focusInSettings) return super.onKeyDown(keyCode, event)
-
-                val isLast = if (focusInList) {
-                    val focus = listView.findFocus()
-                    val adapterCount = listView.adapter?.itemCount ?: return false
-                    focus != null && listView.getChildViewHolder(focus).adapterPosition == adapterCount - 1
-                } else {
-                    false
-                }
-
-                if (!isLast) return super.onKeyDown(keyCode, event)
-
-                homeView.animateTo(-1f) {
-                    preferencesView.listView.getChildAt(1).requestFocus()
-                }
-                return true
-            } else if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                if (focusInList) return super.onKeyDown(keyCode, event)
-
-                val isFirst = if (!focusInList) {
-                    val focus = preferencesView.listView.findFocus()
-                    focus != null && preferencesView.listView.getChildViewHolder(focus).adapterPosition == 1
-                } else {
-                    false
-                }
-
-                if (!isFirst) return super.onKeyDown(keyCode, event)
-
-                homeView.animateTo(0f) {
-                    listView.getChildAt(2 + (if (KlipperInstance.isWebServerRunning()) 1 else 0)).requestFocus()
-                }
-                return true
-            }
-        }
-        return super.onKeyDown(keyCode, event)
-    }
-
-    private fun buildBadges() {
-        for (refBadge in refBadges) {
-            if (refBadge != null) {
-                badgesLayout.removeView(refBadge)
-            }
-        }
-        refBadges = emptyArray()
-    }
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean = super.onKeyUp(keyCode, event)
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean = super.onKeyDown(keyCode, event)
 
     fun isCurrentLauncher(): Boolean = isCurrentLauncher
 
     @EventHandler(runOnMainThread = true)
     fun onInstancesRefreshed(e: InstancesRefreshedEvent) {
         instances = ArrayList(KlipperInstance.getInstances())
-        listView.adapter?.notifyDataSetChanged()
+        instancesAdapter.notifyDataSetChanged()
+        refreshBottomButtons()
+    }
+
+    @EventHandler(runOnMainThread = true)
+    fun onInstanceCreated(e: InstanceCreatedEvent) {
+        instances = ArrayList(KlipperInstance.getInstances())
+        instancesAdapter.notifyDataSetChanged()
+        refreshBottomButtons()
+    }
+
+    @EventHandler(runOnMainThread = true)
+    fun onInstanceUpdated(e: InstanceUpdatedEvent) {
+        instances = ArrayList(KlipperInstance.getInstances())
+        for (i in instances.indices) {
+            if (instances[i].id == e.id) {
+                instancesAdapter.notifyItemChanged(i + 1, NOTIFY_LIVE)
+            }
+        }
+        refreshBottomButtons()
+    }
+
+    @EventHandler(runOnMainThread = true)
+    fun onInstanceDestroyed(e: InstanceDestroyedEvent) {
+        instances = ArrayList(KlipperInstance.getInstances())
+        instancesAdapter.notifyDataSetChanged()
+        refreshBottomButtons()
+    }
+
+    @EventHandler(runOnMainThread = true)
+    fun onInstanceStateChanged(e: InstanceStateChangedEvent) {
+        instances = ArrayList(KlipperInstance.getInstances())
+        for (i in instances.indices) {
+            if (instances[i].id == e.id) {
+                instancesAdapter.notifyItemChanged(i + 1, NOTIFY_LIVE)
+            }
+        }
+        refreshBottomButtons()
     }
 
     @EventHandler(runOnMainThread = true)
     fun onFrontendChanged(e: WebFrontendChangedEvent) {
-        listView.adapter?.notifyItemChanged(1)
+        instancesAdapter.notifyItemChanged(0)
     }
 
-    private fun animateNewOrEditLayout(visible: Boolean) {
-        if (newOrEditAnimation != null) return
+    @EventHandler(runOnMainThread = true)
+    fun onWebStateChanged(e: WebStateChangedEvent) {
+        instancesAdapter.notifyItemChanged(0)
+    }
 
-        if (visible) {
-            resizeFrame.addForceNotMeasure(listView)
-            newOrEditLayout.visibility = View.VISIBLE
-            newOrEditLayout.alpha = 0f
-        } else {
-            resizeFrame.addForceNotMeasure(newOrEditLayout)
-            listView.visibility = View.VISIBLE
-            listView.alpha = 0f
+    private fun invalidateHomeProgress(progress: Float) {
+        val absP = Math.abs(progress)
+        badgesLayout.alpha = 1f - absP
+        instancesRecycler.alpha = 1f - absP * 0.7f
+        badgesLayout.translationY = absP * ViewUtils.dp(16).toFloat()
+        instancesRecycler.translationY = absP * ViewUtils.dp(30).toFloat()
+        if (::bottomButtonsWrap.isInitialized) {
+            bottomButtonsWrap.alpha = 1f - absP * 1.3f
+            bottomButtonsWrap.translationY = absP * ViewUtils.dp(120).toFloat()
         }
 
-        newOrEditAnimation = SpringAnimation(FloatValueHolder(if (visible) 0f else 1f))
-            .setMinimumVisibleChange(1 / 500f)
-            .setSpring(SpringForce(if (visible) 1f else 0f)
-                .setStiffness(850f)
-                .setDampingRatio(SpringForce.DAMPING_RATIO_NO_BOUNCY))
-            .addUpdateListener { _, value, _ ->
-                listView.alpha = 1f - value
-                newOrEditLayout.alpha = value
-            }
-            .addEndListener { _, canceled, _, _ ->
-                if (visible) {
-                    listView.visibility = View.GONE
-                    resizeFrame.removeForceNotMeasure(listView)
-                    nameRow.requestFocus()
-                } else {
-                    newOrEditLayout.visibility = View.GONE
-                    resizeFrame.removeForceNotMeasure(newOrEditLayout)
-                    listView.getChildAt(2 + (if (KlipperInstance.isWebServerRunning()) 1 else 0)).requestFocus()
-                    editInstance = null
-                }
-                newOrEditAnimation = null
-            }
-        newOrEditAnimation?.start()
+        if (homeView.width > 0) {
+            val w = homeView.width.toFloat()
+            preferencesView.translationX = -w * (1f + Math.min(0f, progress))
+            preferencesView.setProgress(-Math.min(0f, progress))
+
+            helpView.translationX = w * (1f - Math.max(0f, progress))
+            helpView.setProgress(Math.max(0f, progress))
+        }
+
+        if (progress <= -0.5f) {
+            preferencesView.bringToFront()
+        } else if (progress >= 0.5f) {
+            helpView.bringToFront()
+        } else {
+            mainPage.bringToFront()
+        }
+
+        val mainInteractive = absP < 0.10f
+        mainPage.isEnabled = mainInteractive
+        mainPage.isClickable = mainInteractive
+        preferencesView.isEnabled = progress < -0.10f
+        preferencesView.isClickable = progress < -0.10f
+        helpView.isEnabled = progress > 0.10f
+        helpView.isClickable = progress > 0.10f
     }
 
     private fun animateHomeView() {
@@ -802,8 +667,16 @@ class MainActivity : AppCompatActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_NOTIFICATIONS && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            notificationsRow?.isChecked = true
+        when (requestCode) {
+            REQUEST_NOTIFICATIONS -> {
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    notificationsRow?.isChecked = true
+                }
+            }
+            REQUEST_CAMERA -> {
+                val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+                preferencesView.refreshCameraSwitch(granted)
+            }
         }
     }
 
@@ -835,60 +708,6 @@ class MainActivity : AppCompatActivity() {
                         .putExtra(UsbManager.EXTRA_PERMISSION_GRANTED, true)
                         .setPackage(packageName))
                 }
-            }
-        }
-    }
-
-    private fun invalidateHomeProgress(progress: Float) {
-        val posProgress = 0f
-        for (i in refBadges.indices) {
-            val j = refBadges.size - 1 - i
-            val beb = 0.3f
-            val pr = (maxOf(posProgress, beb * j) - beb * j) / (1f - beb * j)
-
-            val badge = refBadges[i] ?: continue
-            badge.setProgress(pr)
-
-            val fX = -ViewUtils.dp(9) + badgesLayout.width -
-                    badgesLayout.paddingLeft - badgesLayout.paddingRight -
-                    ViewUtils.dp(22 + 18) * (i + 1) - ViewUtils.dp(8) * i
-            val tX = 0f
-
-            val fY = 0f
-            val tY = ViewUtils.dp(92) + ViewUtils.dp(22 + 18 + 10) * i
-
-            badge.translationX = ViewUtils.lerp(fX.toFloat(), tX, pr)
-            badge.translationY = ViewUtils.lerp(fY, tY.toFloat(), pr)
-        }
-        titleView.translationX = 0f
-        titleView.translationY = 0f
-
-        logoView.scaleX = 1f
-        logoView.scaleY = 1f
-        logoView.translationX = 0f
-        logoView.translationY = 0f
-
-        val negProgress = minOf(0f, progress)
-        listCardView.translationY = negProgress * ViewUtils.dp(92 + (22 + 18) * refBadges.size + 10 * (refBadges.size - 1))
-        listCardView.alpha = 1f + negProgress
-
-        preferencesView.setProgress(-negProgress)
-
-        if (isTV) {
-            if (progress >= 0 && preferencesView.isFocusable) {
-                preferencesView.isFocusable = false
-                preferencesView.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
-            } else if (progress < 0 && !preferencesView.isFocusable) {
-                preferencesView.isFocusable = true
-                preferencesView.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
-            }
-
-            if (progress <= 0 && badgesLayout.isFocusable) {
-                badgesLayout.isFocusable = false
-                badgesLayout.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
-            } else if (progress > 0 && !badgesLayout.isFocusable) {
-                badgesLayout.isFocusable = true
-                badgesLayout.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
             }
         }
     }

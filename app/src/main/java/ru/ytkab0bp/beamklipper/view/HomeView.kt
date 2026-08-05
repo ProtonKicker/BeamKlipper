@@ -15,7 +15,11 @@ import androidx.dynamicanimation.animation.SpringForce
 
 class HomeView(context: Context) : FrameLayout(context) {
     companion object {
+        const val PAGE_SETTINGS = -1f
+        const val PAGE_MAIN = 0f
+        const val PAGE_HELP = 1f
         private const val SETTINGS_ENABLED = true
+        private const val HELP_ENABLED = true
     }
 
     private var progressListener: Consumer<Float>? = null
@@ -34,10 +38,23 @@ class HomeView(context: Context) : FrameLayout(context) {
         gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
             override fun onScroll(e1: MotionEvent?, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
                 if (!processingSwipe && !isTouchDisabled) {
-                    if (progress == 0f && scrollView != null && scrollView!!.canScrollVertically(if ((e1?.y ?: e2.y) - e2.y > 0) 1 else -1)) {
-                        isTouchDisabled = true
-                    } else if (animation == null && Math.abs(e2.y - (e1?.y ?: e2.y)) >= touchSlop && Math.abs(distanceY) >= Math.abs(distanceX) * 1.5f) {
-                        startOffset = e2.y - (e1?.y ?: e2.y)
+                    val startX = e1?.x ?: e2.x
+                    val endX = e2.x
+                    val startY = e1?.y ?: e2.y
+                    val endY = e2.y
+                    val deltaX = endX - startX
+                    val deltaY = endY - startY
+
+                    val canScrollHorizontally = when {
+                        progress == PAGE_MAIN && scrollView != null -> {
+                            if (deltaX > 0) scrollView!!.canScrollHorizontally(-1)
+                            else scrollView!!.canScrollHorizontally(1)
+                        }
+                        else -> false
+                    }
+
+                    if (Math.abs(deltaX) >= touchSlop && Math.abs(deltaX) >= Math.abs(deltaY) * 1.5f && !canScrollHorizontally) {
+                        startOffset = deltaX
                         startProgress = progress
                         processingSwipe = true
 
@@ -52,20 +69,32 @@ class HomeView(context: Context) : FrameLayout(context) {
                     }
                 }
                 if (processingSwipe) {
-                    progress = MathUtils.clamp(
-                        startProgress + (e2.y - (e1?.y ?: e2.y) - startOffset) / height,
-                        -1f, 0f)
+                    val deltaNorm = ((e2.x - (e1?.x ?: e2.x) - startOffset) / (width * 0.9f))
+                    var target = startProgress - deltaNorm
+
+                    if (!SETTINGS_ENABLED && target < 0f) target = 0f
+                    if (!HELP_ENABLED && target > 0f) target = 0f
+
+                    progress = MathUtils.clamp(target, -1f, 1f)
                     invalidateProgress()
                 }
                 return processingSwipe
             }
 
             override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
-                if (processingSwipe && Math.abs(velocityY) >= 3500) {
-                    if (velocityY > 0) {
-                        animateTo(0f)
-                    } else if (SETTINGS_ENABLED) {
-                        animateTo(-1f)
+                if (processingSwipe && Math.abs(velocityX) >= 2500 && Math.abs(velocityX) > Math.abs(velocityY)) {
+                    if (velocityX > 0) {
+                        when {
+                            progress < -0.3f -> animateTo(PAGE_SETTINGS)
+                            progress < 0.7f -> animateTo(PAGE_MAIN)
+                            else -> animateTo(PAGE_HELP)
+                        }
+                    } else {
+                        when {
+                            progress > 0.3f -> animateTo(PAGE_HELP)
+                            progress > -0.7f -> animateTo(PAGE_MAIN)
+                            else -> animateTo(PAGE_SETTINGS)
+                        }
                     }
                 }
                 return false
@@ -87,7 +116,7 @@ class HomeView(context: Context) : FrameLayout(context) {
         animation = SpringAnimation(FloatValueHolder(progress))
             .setMinimumVisibleChange(1 / 256f)
             .setSpring(SpringForce(to)
-                .setStiffness(800f)
+                .setStiffness(700f)
                 .setDampingRatio(SpringForce.DAMPING_RATIO_NO_BOUNCY))
             .addUpdateListener { _, value, _ ->
                 progress = value
@@ -132,8 +161,12 @@ class HomeView(context: Context) : FrameLayout(context) {
         val det = gestureDetector.onTouchEvent(ev)
         if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) {
             if (processingSwipe) {
-                if (animation == null && progress != 0f && progress != -1f) {
-                    if (progress < -0.5f) animateTo(-1f) else animateTo(0f)
+                if (animation == null && progress != PAGE_SETTINGS && progress != PAGE_MAIN && progress != PAGE_HELP) {
+                    when {
+                        progress < -0.5f -> animateTo(PAGE_SETTINGS)
+                        progress > 0.5f -> animateTo(PAGE_HELP)
+                        else -> animateTo(PAGE_MAIN)
+                    }
                 }
             }
             clearFlags()
